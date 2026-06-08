@@ -9,8 +9,8 @@
 Efficient LLM Serving for Multi-turn Conversations with Heterogeneous KV Cache Sharing
 </h3>
 
-[![GitHub](https://img.shields.io/github/stars//beyondHJM/SwiftCache?style=social)](https://github.com/beyondHJM/SwiftCache)
-[![GitHub license](https://img.shields.io/github/license//beyondHJM/SwiftCache)](https://github.com/beyondHJM/SwiftCache/blob/main/LICENSE.txt)
+[![GitHub](https://img.shields.io/github/stars/beyondHJM/SwiftCache?style=social)](https://github.com/beyondHJM/SwiftCache)
+[![GitHub license](https://img.shields.io/github/license/beyondHJM/SwiftCache)](https://github.com/beyondHJM/SwiftCache/blob/main/LICENSE.txt)
 
 ---
 
