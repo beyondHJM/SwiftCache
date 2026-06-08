@@ -1,0 +1,12 @@
+    torch==2.7.0
+    triton>=3.0.0
+    transformers==4.51.0
+    flash-attn
+    xxhash
+    pillow
+    ray
+    uvicorn
+    fastapi
+    SentencePiece
+    pyzmq
+    pybind11

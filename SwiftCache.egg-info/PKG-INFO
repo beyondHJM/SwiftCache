@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: SwiftCache
+Version: 0.0.1
+Summary: An Efficient LLM Serving for Multi-turn Conversations with Heterogeneous KV cache Sharing
+Author: Jianmin Hu
+License-File: LICENSE
+Dynamic: author
+Dynamic: license-file
+Dynamic: summary
