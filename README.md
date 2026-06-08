@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/light-text-logo.png">
-    <img alt="SwiftCache" src="./assets/dark-text-logo.png" width=55%>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/sc.png">
+    <img alt="SwiftCache" src="./assets/sc.png" width=55%>
   </picture>
 </p>
 
@@ -76,19 +76,6 @@ Together, these two mechanisms allow SwiftCache to:
 - support longer context lengths,
 - and lower end-to-end TTFT latency.
 
-## Current Limitations
-
-- **Multi-GPU / Single-Node Only**  
-  SwiftCache is designed for single-node multi-GPU environments with NVLink interconnects.
-
-- **Model Support**  
-  The current implementation may only support a subset of model families such as Qwen3 and LLaMA2, depending on the codebase status.
-
-- **System Complexity**  
-  SwiftCache introduces coordination between master and slave models, which requires careful memory management and scheduling.
-
-- **Code and Documentation**  
-  The implementation may still be under active development, so some modules may have limited comments or incomplete documentation.
 
 ## Installation
 
@@ -97,7 +84,7 @@ Together, these two mechanisms allow SwiftCache to:
 - Python 3.10+
 - PyTorch 2.x
 - CUDA 12.x
-- NVIDIA GPUs with NVLink support
+- NVIDIA GPUs with NVLink support, at least 2 GPUs
 - Sufficient GPU memory for at least one master/slave model setup
 
 ### Installation Steps
