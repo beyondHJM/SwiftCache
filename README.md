@@ -87,7 +87,7 @@ Together, these two mechanisms allow SwiftCache to:
 - NVIDIA GPUs with NVLink support, at least 2 GPUs
 - Sufficient GPU memory for at least one master/slave model setup
 
-### Installation Steps
+### Quick start
 
 1. Clone the repository:
    ```bash
