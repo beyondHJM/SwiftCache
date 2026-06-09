@@ -7,7 +7,7 @@ body = {
     "max_tokens": 100
 }
 
-resp = requests.post(url, json=body, headers={"Authorization": "Bearer your_token_here"})
+resp = requests.post(url, json=body)
 print("status_code:", resp.status_code)
 print("text:", resp.text)
 
