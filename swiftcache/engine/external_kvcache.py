@@ -488,6 +488,14 @@ class ExternalKVCacheController:
             (runtime_dir()/f'num_blocks_{rank}.json').unlink(missing_ok=True)
 
     def load_kvcache(self,k_cache,v_cache,layer_id):
+        measured=getattr(self,'profile_events',None)
+        if measured is not None:
+            begin=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True);begin.record()
+        self._load_kvcache(k_cache,v_cache,layer_id)
+        if measured is not None:
+            end.record();measured.append(('load',begin,end))
+
+    def _load_kvcache(self,k_cache,v_cache,layer_id):
         # print(f"{self.prefix_str} load start {layer_id}")
         # print(f'{self.prefix_str} layer:{layer_id}',k_cache.shape)
         for slave_id in self.slave_list:
@@ -512,6 +520,14 @@ class ExternalKVCacheController:
         # store_kvcache(self.blocks_loaded_buffer[0],self.blocks_loaded_buffer[1],k_cache,v_cache,self.blocks_loaded,self.block_elem_count)
         # print(f"{self.prefix_str} load end {layer_id}")
     def store_kvcache(self,k_cache,v_cache,layer_id):
+        measured=getattr(self,'profile_events',None)
+        if measured is not None:
+            begin=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True);begin.record()
+        self._store_kvcache(k_cache,v_cache,layer_id)
+        if measured is not None:
+            end.record();measured.append(('store',begin,end))
+
+    def _store_kvcache(self,k_cache,v_cache,layer_id):
         for slave_id in self.slave_list:
 
             if global_config['transfer_full_kvcache']:

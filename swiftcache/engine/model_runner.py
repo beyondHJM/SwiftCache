@@ -161,9 +161,10 @@ class ModelRunner:
         t = time.perf_counter()
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
-        max_num_batched_tokens, max_model_len = self.config.max_num_batched_tokens, self.config.max_model_len
+        max_model_len=min(self.config.warmup_tokens,self.config.max_model_len)
+        max_num_batched_tokens=max(max_model_len,self.config.max_num_batched_tokens)
         print(self.config.max_num_batched_tokens,self.config.max_model_len,self.config.max_num_seqs)
-        num_seqs = min(max_num_batched_tokens // max_model_len, self.config.max_num_seqs)
+        num_seqs = 1  # initialization scratch size is independent of serving context/batch limits
         print(f'num_seqs:{num_seqs}')
         seqs = [Sequence([0] * max_model_len) for _ in range(num_seqs)]
         self.run(seqs, True)
@@ -573,7 +574,8 @@ class ModelRunner:
         for seq in seqs:
             seqlen = len(seq)
             input_ids.extend(seq[seq.num_cached_tokens:])
-            print(f'{self.prefix_str} 请求{seq.seq_id},命中了{seq.num_cached_tokens}个token，请求的prompt长度为{seq.num_prompt_tokens}')
+            if os.environ.get('SWIFTCACHE_DEBUG'):
+                print(f'{self.prefix_str} request={seq.seq_id} cached={seq.num_cached_tokens} prompt={seq.num_prompt_tokens}')
             positions.extend(list(range(seq.num_cached_tokens, seqlen)))
             if seq.input_embeds is not None:
                 input_embeds.append(seq.input_embeds[seq.num_cached_tokens:,:])
@@ -685,6 +687,7 @@ class ModelRunner:
         for seq in seqs:
             temperatures.append(seq.temperature)
         temperatures = torch.tensor(temperatures, dtype=torch.float32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        self.sample_top_ps = torch.tensor([getattr(seq,'top_p',1.0) for seq in seqs],dtype=torch.float32,device='cpu',pin_memory=True).cuda(non_blocking=True)
         return temperatures
 
     @torch.inference_mode()
@@ -719,19 +722,36 @@ class ModelRunner:
             self.controller.wait_last_event()
 
     def run(self, seqs: list[Sequence], is_prefill: bool) -> list[int]:
+        t0=time.perf_counter_ns()
         self.cal_num_blocks_per_slave(seqs,self.config)
-        t1 = time.perf_counter()
-        input_ids, positions,input_embeds = self.prepare_prefill(seqs) if is_prefill else self.prepare_decode(seqs)
-        # print('input_ids:',input_ids.shape)
-        temperatures = self.prepare_sample(seqs) if self.rank == self.first_rank else None
-        logits = self.run_model(input_ids, positions,input_embeds, is_prefill,input_embeds is not None)
-        range_push("sample")
-
-        token_ids = self.sampler(logits, temperatures) if self.rank == self.first_rank else None
-        token_ids = token_ids.tolist()
+        if self.role=='master':
+            self.controller.profile_events=[] if self.config.profile_stages else None
+        input_ids,positions,input_embeds=self.prepare_prefill(seqs) if is_prefill else self.prepare_decode(seqs)
+        temperatures=self.prepare_sample(seqs)
+        t1=time.perf_counter_ns()
+        if self.config.profile_stages:
+            start=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True)
+            start.record()
+        logits=self.run_model(input_ids,positions,input_embeds,is_prefill,input_embeds is not None)
+        if self.config.profile_stages: end.record()
+        t2=time.perf_counter_ns()
+        token_ids=self.sampler(logits,temperatures,self.sample_top_ps).tolist()
         self.quiesce()
-        # print('run time:',time.perf_counter() - t1)
-        range_pop()
+        t3=time.perf_counter_ns()
+        metric=dict(prepare_wall_ms=(t1-t0)/1e6,model_submit_wall_ms=(t2-t1)/1e6,
+                    model_and_sample_wall_ms=(t3-t1)/1e6,
+                    input_query_tokens=int(input_ids.numel()),batch_size=len(seqs))
+        if self.config.profile_stages:
+            metric['model_gpu_span_ms']=start.elapsed_time(end)
+            metric['logits_finite']=bool(torch.isfinite(logits).all())
+            events=self.controller.profile_events if self.role=='master' else []
+            for action in ['load','store']:
+                metric[f'kv_{action}_span_sum_ms']=sum(x.elapsed_time(y) for kind,x,y in events if kind==action)
+        if self.role=='master':
+            info=getattr(self.controller,'slave_info',{})
+            metric['remote_loaded_blocks']=sum(v['load']['length'] for v in info.values())
+            metric['remote_stored_blocks']=sum(v['store']['length'] for v in info.values())
+        self.last_run_metrics=metric
         reset_context()
         return token_ids
 

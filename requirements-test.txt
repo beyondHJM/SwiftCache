@@ -1,0 +1,3 @@
+-r requirements-serving.txt
+pytest>=8,<10
+langchain-openai>=1,<2

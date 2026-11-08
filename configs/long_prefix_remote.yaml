@@ -1,0 +1,32 @@
+host: 127.0.0.1
+port: 18000
+internal_base_port: 18001
+dist_port: 18334
+enable_thinking: false
+models:
+  - name: qwen3-8b-master
+    model: /root/llm-resource/Models/Qwen3-8B
+    gpu: 0
+    role: master
+    engine:
+      max_model_len: 131072
+      ignore_model_max_length: true
+      max_num_batched_tokens: 131072
+      max_num_seqs: 8
+      cache_block_limit: 448
+      warmup_tokens: 2048
+      elastic_enabled: false
+      profile_stages: true
+  - name: qwen3-8b-worker
+    model: /root/llm-resource/Models/Qwen3-8B
+    gpu: 1
+    role: worker
+    engine:
+      max_model_len: 8192
+      max_num_batched_tokens: 8192
+      max_num_seqs: 1
+      cache_block_limit: 448
+      elastic_initial_blocks: 1
+      elastic_enabled: false
+      warmup_tokens: 1024
+      profile_stages: true

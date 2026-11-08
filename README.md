@@ -77,37 +77,33 @@ Together, these two mechanisms allow SwiftCache to:
 - and lower end-to-end TTFT latency.
 
 
-## Installation
+## Unified serving and OpenAI clients
 
-For the acknowledged elastic-cache implementation, two-GPU launcher, and
-reproducible correctness checks, see [Elastic cache implementation and verification](docs/elastic-cache.md).
+The canonical startup is now configuration driven:
 
-The elastic path currently uses the Python scheduler and TP=1 per model.
+```bash
+python -m server.starter --config configs/two_qwen8b.yaml
+```
 
-### Prerequisites
+The public gateway routes `/v1/chat/completions`, `/v1/completions`, and
+`/v1/models` by served model name. Official `OpenAI`/`AsyncOpenAI` clients and
+LangChain `ChatOpenAI` are tested, including real token streaming and cancellation.
+Legacy startup names forward to the same launcher.
 
-- Python 3.10+
-- PyTorch 2.x
-- CUDA 12.x
-- NVIDIA GPUs with NVLink support, at least 2 GPUs
-- Sufficient GPU memory for at least one master/slave model setup
+See [serving, client examples, configuration and compatibility](docs/openai-serving.md)
+for installation and supported API parameters, and
+[elastic ownership protocol](docs/elastic-cache.md) for cache coordination.
 
-### Quick start
+## Long-prefix measurements
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-org/SwiftCache.git
-   cd SwiftCache
+`configs/long_prefix_remote.yaml` and `configs/long_prefix_local.yaml` define
+reproducible two-Qwen3-8B tests. `--ignore-model-max-length` explicitly bypasses
+model-config context caps while retaining actual KV capacity checks.
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   pip install -e .
+Benchmarks under `tests/bench_*.py` separate real Python scheduling from GPU
+execution and end-to-end OpenAI HTTP latency. They verify actual cache hits,
+use independent token objects in CPU tests, and report unmodified baseline and
+optimized results separately. Test artifacts are under `artifacts/phase2/`.
 
-3. Start a server:
-   ```bash
-   python ./server/starter.py
-
-4. Run a example in a new terminal:
-   ```bash
-   python example.py
+NVLink is not necessary for correctness: two A100 PCIe 40GB GPUs with peer access
+are used for these checks. This is not a reproduction of NVLink performance.

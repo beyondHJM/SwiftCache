@@ -27,6 +27,14 @@ class Request:
         self.output = ""
         self.time_usage = None
         self.prefix_cached = 0
+        self.top_p = 1.0
+        self.stop = []
+        self.finish_reason = None
+        self.visible_text = ''
+        self.stream_queue = asyncio.Queue()
+        self.metrics = {'batches': []}
+        self.cancelled = False
+        self.streaming = False
     
     def output_dict(self):
         return {'prompt':prompt}

@@ -46,6 +46,9 @@ class Config:
     elastic_window_seconds: float = 60.0
     elastic_check_seconds: float = 1.0
     control_timeout_seconds: float = 120.0
+    ignore_model_max_length: bool = False
+    warmup_tokens: int = 2048
+    profile_stages: bool = False
 
     def __post_init__(self):
         assert os.path.isdir(self.model)
@@ -54,6 +57,12 @@ class Config:
         self.hf_config = AutoConfig.from_pretrained(self.model)
         max_position_embeddings = getattr(self.hf_config, 'max_position_embeddings', None)
         max_position_embeddings = max_position_embeddings if max_position_embeddings is not None else self.hf_config.language_config.max_position_embeddings
-        self.max_model_len = min(self.max_model_len, max_position_embeddings )
-        assert self.max_num_batched_tokens >= self.max_model_len
+        self.original_model_max_length = max_position_embeddings
+        if self.max_model_len <= 0 or self.max_num_batched_tokens <= 0:
+            raise ValueError('Context length and batch token budget must be positive')
+        if self.ignore_model_max_length:
+            self.hf_config.max_position_embeddings = max(max_position_embeddings,self.max_model_len)
+            print(f'Ignoring model context cap {max_position_embeddings}; runtime limit={self.max_model_len}; RoPE unchanged',flush=True)
+        else:
+            self.max_model_len = min(self.max_model_len, max_position_embeddings)
 

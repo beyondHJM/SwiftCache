@@ -48,6 +48,7 @@ class Sequence:
         self.cum_blocks_per_slave = [] #len = len(slave_list)+1 
         self.block_belong_to_slave = [] #len = len(self.block_table)
         self.temperature = sampling_params.temperature
+        self.top_p = sampling_params.top_p
         self.max_tokens = sampling_params.max_tokens
         self.ignore_eos = sampling_params.ignore_eos
         self.time_usage = []

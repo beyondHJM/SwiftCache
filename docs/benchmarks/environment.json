@@ -1,0 +1,41 @@
+{
+  "server": "Cloud-A100-233",
+  "date": "2026-11-08",
+  "python": "3.11.15",
+  "platform": "Linux-5.15.0-78-generic-x86_64-with-glibc2.35",
+  "baseline": "16815fcdd8d87e71bb4099dda6d46f65f1a286a2",
+  "packages": {
+    "torch": "2.6.0+cu124",
+    "flash-attn": "2.8.3",
+    "triton": "3.2.0",
+    "transformers": "4.51.0",
+    "numpy": "2.4.6",
+    "xxhash": "3.7.0",
+    "openai": "3.46.0",
+    "httpx": "0.28.1",
+    "fastapi": "0.162.2",
+    "uvicorn": "0.54.0",
+    "pydantic": "2.14.3",
+    "langchain-openai": "1.7.4",
+    "pytest": "9.2.0"
+  },
+  "cpu": "Architecture:                    x86_64\nCPU op-mode(s):                  32-bit, 64-bit\nAddress sizes:                   46 bits physical, 48 bits virtual\nByte Order:                      Little Endian\nCPU(s):                          104\nOn-line CPU(s) list:             0-103\nVendor ID:                       GenuineIntel\nModel name:                      Intel(R) Xeon(R) Gold 6230R CPU @ 2.10GHz\nCPU family:                      6\nModel:                           85\nThread(s) per core:              2\nCore(s) per socket:              26\nSocket(s):                       2\nStepping:                        7\nCPU max MHz:                     4000.0000\nCPU min MHz:                     1000.0000\nBogoMIPS:                        4200.00\nFlags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 invpcid_single intel_ppin ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts pku ospke avx512_vnni md_clear flush_l1d arch_capabilities\nVirtualization:                  VT-x\nL1d cache:                       1.6 MiB (52 instances)\nL1i cache:                       1.6 MiB (52 instances)\nL2 cache:                        52 MiB (52 instances)\nL3 cache:                        71.5 MiB (2 instances)\nNUMA node(s):                    2\nNUMA node0 CPU(s):               0-25,52-77\nNUMA node1 CPU(s):               26-51,78-103\nVulnerability Itlb multihit:     KVM: Mitigation: VMX disabled\nVulnerability L1tf:              Not affected\nVulnerability Mds:               Not affected\nVulnerability Meltdown:          Not affected\nVulnerability Mmio stale data:   Mitigation; Clear CPU buffers; SMT vulnerable\nVulnerability Retbleed:          Mitigation; Enhanced IBRS\nVulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp\nVulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:        Mitigation; Enhanced IBRS, IBPB conditional, RSB filling, PBRSB-eIBRS SW sequence\nVulnerability Srbds:             Not affected\nVulnerability Tsx async abort:   Mitigation; TSX disabled\n",
+  "gpu": "0, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07\n1, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07\n2, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07\n3, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07\n",
+  "topology": "\t\u001b[4mGPU0\tGPU1\tGPU2\tGPU3\tNIC0\tCPU Affinity\tNUMA Affinity\tGPU NUMA ID\u001b[0m\nGPU0\t X \tPIX\tNODE\tNODE\tPIX\t0-25,52-77\t0\t\tN/A\nGPU1\tPIX\t X \tNODE\tNODE\tPIX\t0-25,52-77\t0\t\tN/A\nGPU2\tNODE\tNODE\t X \tPIX\tNODE\t0-25,52-77\t0\t\tN/A\nGPU3\tNODE\tNODE\tPIX\t X \tNODE\t0-25,52-77\t0\t\tN/A\nNIC0\tPIX\tPIX\tNODE\tNODE\t X \t\t\t\t\n\nLegend:\n\n  X    = Self\n  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)\n  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node\n  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)\n  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)\n  PIX  = Connection traversing at most a single PCIe bridge\n  NV#  = Connection traversing a bonded set of # NVLinks\n\nNIC Legend:\n\n  NIC0: mlx5_0\n\n",
+  "configs": {
+    "two_qwen8b.yaml": "8adaed9e13cbddb1e461f66dc3025623806ad6e2f4b90f4af8c16684c3a2a7d3",
+    "long_prefix_remote.yaml": "bbddb97b85d4b39b87af2aee89b12526613794eb99b7cd84e19dcea5bee11607",
+    "long_prefix_local.yaml": "ecdb06ca6588c91e941bf4f2e5efab293b3830eef2392f36ae65cfd6f9419d9c"
+  },
+  "model_config_sha256": "f7c4eadfbbf522470667b797a3c89be2524832d2d599797248dc304fff447c30",
+  "model_path": "/root/llm-resource/Models/Qwen3-8B",
+  "allocated_gpus": [
+    0,
+    1
+  ],
+  "thread_env": {
+    "OMP_NUM_THREADS": 4,
+    "OPENBLAS_NUM_THREADS": 4
+  },
+  "notes": "Shared server; no CPU affinity/isolation. Other GPUs were not used or modified."
+}
