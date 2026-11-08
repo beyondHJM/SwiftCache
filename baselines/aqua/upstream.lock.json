@@ -1,0 +1,26 @@
+{
+  "paper": "https://arxiv.org/html/2407.21255v3",
+  "source": "https://github.com/aquaml/aqua",
+  "commit": "0ed7c15c07f5387c71b8eeaec48e4921c79d18d2",
+  "license": "AGPL-3.0",
+  "source_file_sha256": {
+    "datastructures/responsive_tensor.py": "46d26714985a746e1c312d4d3de2aed886bb4498f62c727bbc1a2c3dc174aca4",
+    "policies/aqua_policy.py": "dc26df57b34d8a84c8befec6e782b052bd6f037b80177d25568e62ef537d9bd2",
+    "policies/static_policy.py": "f14e63ae6690ccc9e71a39148ca1b49efdcd0827f9458dd9a4a0ad203de96fab",
+    "policies/dynamic_policy.py": "e44b76ae8af3d7eb21d2c88dc8c6d348680fc1d2144e74336a75b5d29e654995",
+    "core/responsive_manager.py": "e842639b20f9c32df8182c520b1b4d82ca5d17cfc2ddcab7210504cdd9eff144",
+    "core/logger.py": "b01eedca0f3f1f512d6feefa1a9035ab75d20378d952d600ce9cd3e0ebda084d",
+    "controller/mmc.py": "152764f827e5e7f5be7cee2ebc9094f605d658a8ffca2af6af9c10ae03a4c4fc",
+    "utils/virtual_gid.py": "feda17b85c9b39de1e3ba377952f8252bbc7301d25e4bf8afcf1f771305fd430",
+    "LICENSE": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+  },
+  "changes": "Package imports namespaced; trailing whitespace/final newlines normalized; empty __init__.py packaging files added. No behavioral changes in vendor files.",
+  "coordinator_reference": {
+    "url": "https://github.com/aquaml/coordinator",
+    "commit": "222d9a94c7e9682fc1fde52f3ab37e9ba7f27418"
+  },
+  "vllm_reference": {
+    "url": "https://github.com/aquaml/vllm",
+    "commit": "a81d9e6d776f7fba09deca92734b4ccf591ecd50"
+  }
+}

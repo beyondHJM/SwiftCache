@@ -300,3 +300,22 @@ and [Python/OpenAI long-prefix results](docs/performance-results-2026-11-08.md).
 Raw artifacts are stored under `artifacts/cpp-scheduler/` and `artifacts/phase2/`
 on the validation server; they are not committed to Git. Compact metric
 summaries and charts are committed under `docs/benchmarks/`.
+
+## Baselines
+
+The independent [Aqua Qwen3-8B baseline](baselines/aqua/README.md) lives under
+`baselines/aqua/` on branch `codex/aqua-baseline`. It uses official Aqua tensors,
+a compatible memory coordinator and a minimal HF/SDPA executor, with producer
+reclamation to DRAM, prefix reuse and logical CFS scheduling. It does not reuse
+SwiftCache's scheduler, block allocator or Layer Stream Cache.
+
+```bash
+git fetch origin
+git switch codex/aqua-baseline
+.venv/bin/python -m pip install -r baselines/aqua/requirements.txt
+.venv/bin/python -m baselines.aqua.run --gpus 0,2 --scenario validate
+```
+
+This is a functional baseline with serialized execution, not a reproduction of
+the original Aqua vLLM/FlexGen throughput. See its README for model requirements,
+the minimal API, memory limits, source provenance and reproduction commands.

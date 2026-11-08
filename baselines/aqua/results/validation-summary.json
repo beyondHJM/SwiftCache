@@ -1,0 +1,139 @@
+{
+  "date": "2026-11-08",
+  "purpose": "Functional minimal Aqua baseline; serialized HF execution, not a paper throughput reproduction",
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-5.15.0-78-generic-x86_64-with-glibc2.35",
+    "torch": "2.6.0+cu124",
+    "transformers": "4.51.0",
+    "openai": "3.46.0",
+    "cuda": "12.4",
+    "model": "/root/llm-resource/Models/Qwen3-8B",
+    "physical_gpus": [
+      0,
+      2
+    ],
+    "dtype": "bfloat16",
+    "base_commit": "fbf9dc083a7afb1602fe9ee23c73b13a9ec9a0c4",
+    "gpu_inventory": [
+      "0, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07",
+      "1, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07",
+      "2, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07",
+      "3, NVIDIA A100-PCIE-40GB, 40960 MiB, 580.82.07"
+    ],
+    "source_verified": true,
+    "source_files_verified": 9,
+    "normal_exit_empty_ledger": true,
+    "startup_cancel": {
+      "early_sigterm_clean": true,
+      "coordinator_port_released": true
+    }
+  },
+  "validation": {
+    "real_model": "Qwen3-8B",
+    "models_loaded": 2,
+    "reference_cases": 3,
+    "burst_requests": 4,
+    "reclaim_cycles": 3,
+    "producer_requests": 10,
+    "prefix_cached_tokens": 512,
+    "gpu_dram_roundtrip_exact": true,
+    "cpu_fallback": true,
+    "cancellation_released": true,
+    "p2p": true
+  },
+  "event_counts": {
+    "initialized": 1,
+    "arrival": 25,
+    "forward": 161,
+    "finished": 24,
+    "offload": 100,
+    "preempt": 95,
+    "restore": 109,
+    "snapshot_closed": 99,
+    "resume": 94,
+    "prefix_cached": 1,
+    "prefix_hit": 5,
+    "producer_reclaim_requested": 4,
+    "gpu_to_dram_complete": 4,
+    "tensor_migrated": 14,
+    "producer_reclaimed": 4,
+    "producer_offered": 4,
+    "scheduler_mode": 2,
+    "failed": 1
+  },
+  "migration_locations": {
+    "DRAM": 7,
+    "GPU": 7
+  },
+  "restore_sources": {
+    "GPU": 102,
+    "DRAM": 7
+  },
+  "offload_paths": {
+    "gpu_peer": 97,
+    "gpu_to_dram": 3
+  },
+  "semantic": [
+    {
+      "prompt": "What is 2 + 2? Reply only with the number.",
+      "text": "4",
+      "token_ids_equal": true
+    },
+    {
+      "prompt": "Translate into Chinese: The cache is working correctly.",
+      "text": "缓存工作正常。",
+      "token_ids_equal": true
+    },
+    {
+      "prompt": "The access code is SILVER-731. What is the code? Reply with only the code.",
+      "text": "SILVER-731",
+      "token_ids_equal": true
+    }
+  ],
+  "burst": {
+    "samples": 4,
+    "prompt_tokens": 346,
+    "completion_tokens": 12,
+    "median_ttft_ms": 1692.932333,
+    "median_total_ms": 6826.6073485,
+    "ttft_ms": [
+      1512.816615,
+      1635.753637,
+      1750.111029,
+      1865.614502
+    ],
+    "total_ms": [
+      6798.749354,
+      6815.288268,
+      6837.926429,
+      6854.38281
+    ]
+  },
+  "http": {
+    "sdk_sync": true,
+    "sdk_async_concurrent": 4,
+    "unsupported_rejected": true,
+    "prefix_cached_tokens": 26
+  },
+  "final_ledgers": {
+    "validation.final-ledger.json": {
+      "providers": {},
+      "allocations": [],
+      "mappings": {}
+    },
+    "http-server.final-ledger.json": {
+      "providers": {},
+      "allocations": [],
+      "mappings": {}
+    }
+  },
+  "artifact_sha256": {
+    "validation.json": "f6f4ab6646ec519b4339468f9c95479fd2eda7889abbbb3cbe83ec6fce04a01f",
+    "http-validation.json": "2652c368336ae9258cbd10059aceb442d6b4a91baddd87c7873fba18e6802af8",
+    "validation.final-ledger.json": "bbf3c9bc81e50a79f4b97f2412089997ab7e7fa7b27b212d03f305fb826ef230",
+    "http-server.final-ledger.json": "342ac63ea1666dba169faa46b15a3af60f847d48a919a32b6727664caac0f8dc",
+    "environment.json": "c7673b9e1a374a7b9ca77b1d59f53a3b5fc7ce5bbbe9a51a19e6ac3665b59a8b",
+    "startup-cancel-result.json": "2685259091cecaa023af3667795f4bda8b8b509726a566a6d33f5783c3fcb7ff"
+  }
+}

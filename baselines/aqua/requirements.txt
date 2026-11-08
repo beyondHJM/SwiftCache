@@ -1,0 +1,3 @@
+# Reuse the existing SwiftCache CUDA-enabled .venv; do not replace its torch.
+-r ../../requirements-serving.txt
+requests>=2.31,<3
