@@ -79,6 +79,11 @@ Together, these two mechanisms allow SwiftCache to:
 
 ## Installation
 
+For the acknowledged elastic-cache implementation, two-GPU launcher, and
+reproducible correctness checks, see [Elastic cache implementation and verification](docs/elastic-cache.md).
+
+The elastic path currently uses the Python scheduler and TP=1 per model.
+
 ### Prerequisites
 
 - Python 3.10+

@@ -63,6 +63,7 @@ class LLMEngine:
         config.eos = self.tokenizer.eos_token_id
         print(f"{config.role}{config.rank}调度器开始创建")
         self.scheduler = Scheduler(config)
+        self.scheduler.block_manager.quiesce = self.model_runner.quiesce
         print(f"{config.role}{config.rank}调度器创建成功")
         # time.sleep(5)
         self.warm_up()
@@ -72,7 +73,7 @@ class LLMEngine:
         print("end init")
 
     def exit(self):
-        if global_config['kv_cache_strategy'] == 'external_gpu':
+        if global_config['kv_cache_strategy'] == 'external_gpu' and self.config.role == 'master':
             self.model_runner.controller.exit()
         self.model_runner.call("exit")
         del self.model_runner
@@ -111,10 +112,13 @@ class LLMEngine:
         # t1= perf_counter()
         t = perf_counter()
         seqs, scheduling_type = self.scheduler.schedule()
+        if not seqs:
+            return [], 0
         
         if USE_CSCHEDULER:
             seqs_py = sequence_cpp_to_py(seqs)
-        print(f'{self.config.role} scheduler时间:{(perf_counter()-t)*1000:.3f} ms')
+        if os.environ.get('SWIFTCACHE_DEBUG'):
+            print(f'{self.config.role} scheduler时间:{(perf_counter()-t)*1000:.3f} ms')
             # for seq in seqs:
             #     self.seqs_in_scheduler[seq.seq_id] = seq
 
@@ -256,8 +260,10 @@ class LLMEngine:
     async def _main_event_loop(self):
         cnt = 1
         while True:
+            self.scheduler.block_manager.poll()
             while not self.is_finished():
                 output, num_tokens = self.step()
+                await asyncio.sleep(.001 if num_tokens == 0 else 0)
                 # if scheduling_type in [SchedulingType.IMAGE_PROCESSING,SchedulingType.VISION_ENCODING]:
                 #     print("not implement",scheduling_type)
                 for seq_id, token_ids,time_usage,extra_info in output:
@@ -283,6 +289,11 @@ class LLMEngine:
         else:
             token_ids = req.token_ids
             prompt = self.tokenizer.decode(token_ids)
+        if not token_ids or len(token_ids) + max_tokens > self.config.max_model_len:
+            raise ValueError("Request must be nonempty and fit max_model_len including output")
+        capacity = self.config.num_kvcache_blocks * self.config.kvcache_block_size
+        if len(token_ids) + max_tokens > capacity:
+            raise ValueError("Request exceeds physical KV capacity")
         sampling_params = SamplingParams(temperature,max_tokens,req.ignore_eos)
         request_id = req.request_id
         seq = Sequence(token_ids,sampling_params,seq_id = request_id)
@@ -292,6 +303,6 @@ class LLMEngine:
         # print(f'add success!,seq_id:{seq.seq_id}')
         await finished_event.wait()
         req.output = self.tokenizer.decode(req.output_token_ids)
-        self.request_dict[request_id]=None
+        self.request_dict.pop(request_id,None)
         #TODO
         

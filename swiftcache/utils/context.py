@@ -17,12 +17,12 @@ class Context:
     num_hidden_layers:int = 0
     layer_elem:int = 0
     boundary: int = 0
-    default_stream = torch.cuda.default_stream()
-    transfer_stream: torch.cuda.Stream = field(default_factory=torch.cuda.Stream)
+    default_stream = None
+    transfer_stream: torch.cuda.Stream = None
     # transfer_stream: torch.cuda.Stream = torch.cuda.default_stream()
-    h2d_finished_event: torch.cuda.Event = field(default_factory=torch.cuda.Event)
-    attn_event: torch.cuda.Event = field(default_factory=torch.cuda.Event)
-    write_event: torch.cuda.Event = field(default_factory=torch.cuda.Event)
+    h2d_finished_event: torch.cuda.Event = None
+    attn_event: torch.cuda.Event = None
+    write_event: torch.cuda.Event = None
     role:str = 'master'
     external_num_blocks:int = 0
     local_num_blocks: int = 0
@@ -82,3 +82,12 @@ def set_external_local_num_blocks(external_num_blocks, local_num_blocks):
     _CONTEXT.external_num_blocks = external_num_blocks
     _CONTEXT.local_num_blocks = local_num_blocks
 
+
+def init_device_context():
+    """Create streams only after the process has selected its own GPU."""
+    ctx = _CONTEXT
+    ctx.default_stream = torch.cuda.current_stream()
+    ctx.transfer_stream = torch.cuda.Stream()
+    ctx.h2d_finished_event = torch.cuda.Event()
+    ctx.attn_event = torch.cuda.Event()
+    ctx.write_event = torch.cuda.Event()

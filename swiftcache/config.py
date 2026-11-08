@@ -27,7 +27,7 @@ class Config:
     rank: int = 0
     role: str = 'master'
     dist_port:int = 2334
-    external_kvcache_config: ExternalKVCacheConfig = ExternalKVCacheConfig()
+    external_kvcache_config: ExternalKVCacheConfig = field(default_factory=ExternalKVCacheConfig)
     master_list:list = field(default_factory = list)
     slave_list:list = field(default_factory = list)
     slave_event:dict | Event = field(default_factory = dict)
@@ -39,6 +39,13 @@ class Config:
 
 
 
+
+    cache_block_limit: int = -1
+    elastic_enabled: bool = True
+    elastic_initial_blocks: int = 1
+    elastic_window_seconds: float = 60.0
+    elastic_check_seconds: float = 1.0
+    control_timeout_seconds: float = 120.0
 
     def __post_init__(self):
         assert os.path.isdir(self.model)

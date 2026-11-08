@@ -39,6 +39,7 @@ class Scheduler:
     #     return not self.waiting and not self.running and not self.vision_waiting and not self.vision_running
     def add(self, seq: Union[Sequence, VisionSequence]):
         if isinstance(seq, Sequence):
+            self.block_manager.observe(seq)
             self.waiting.append(seq)
         # if isinstance(seq, VisionSequence):
         #     if seq.status == VisionStatus.WAITING:
@@ -68,13 +69,9 @@ class Scheduler:
         #     scheduled_seqs['vision_encode_seqs'].append(seq)
         #     return scheduled_seqs['vision_encode_seqs'],SchedulingType.VISION_ENCODING
 
-        if self.config.role == 'master':
-            self.block_manager.free_block_ids.sync_num_free_blocks()
-            self.block_manager.master_check_blocks_update()
-            self.cnt +=1
-            if self.cnt % 100 == 0:
-                print("===---------")
-                self.block_manager.print_block_info()
+        self.block_manager.request_floor = max(
+            (s.num_blocks for s in self.waiting),default=0)
+        self.block_manager.poll()
 
         # prefill
         num_seqs = 0
@@ -111,7 +108,8 @@ class Scheduler:
                 num_seqs += 1
                 self.block_manager.may_append(seq)
                 scheduled_seqs['decoding_seqs'].append(seq)
-        assert scheduled_seqs['decoding_seqs']
+        if not scheduled_seqs['decoding_seqs']:
+            return [], 'idle'
         self.running.extendleft(reversed(scheduled_seqs['decoding_seqs']))
         # print(f'KV Cache 使用率为{usage_rate*100:.2f}%')
         return scheduled_seqs['decoding_seqs'], "decoding"

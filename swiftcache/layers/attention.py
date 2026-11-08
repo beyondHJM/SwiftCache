@@ -158,7 +158,10 @@ class Attention2(nn.Module):
         context = get_context()
         k_cache, v_cache = self.k_cache, self.v_cache
         if k_cache.numel() and v_cache.numel():
-                # 恢复kv cache
+                # A fresh prefill may store without loading. Its next layer must not
+            # overwrite LSC until the previous layer's asynchronous store finishes.
+            context.default_stream.wait_stream(context.transfer_stream)
+            # 恢复kv cache
             if context.controller.need_load:
                 # print("xxxx")
                 with torch.cuda.stream(context.transfer_stream):

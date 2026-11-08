@@ -11,7 +11,9 @@ class Sampler(nn.Module):
     def forward(self, logits: torch.Tensor, temperatures: torch.Tensor):
         logits = logits.to(torch.float)
         greedy_tokens = logits.argmax(dim=-1)
-        logits.div_(temperatures.unsqueeze(dim=1))
+        if bool(torch.all(temperatures == 0)):
+            return greedy_tokens
+        logits.div_(temperatures.clamp_min(1e-6).unsqueeze(dim=1))
         probs = torch.softmax(logits, dim=-1, dtype=torch.float)
         # logprobs = torch.log_softmax(logits, dim=-1, dtype=torch.float)
         epsilon = 1e-10  
