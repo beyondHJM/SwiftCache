@@ -1,6 +1,7 @@
 from collections import deque
 from enum import Enum, auto
 from typing import Union
+import time
 
 from swiftcache.config import Config
 from swiftcache.engine.sequence import Sequence, SequenceStatus, RequestType, VisionSequence, VisionStatus
@@ -69,20 +70,30 @@ class Scheduler:
         #     scheduled_seqs['vision_encode_seqs'].append(seq)
         #     return scheduled_seqs['vision_encode_seqs'],SchedulingType.VISION_ENCODING
 
+        control_start=time.perf_counter_ns()
         self.block_manager.request_floor = max(
             (s.num_blocks for s in self.waiting),default=0)
         self.block_manager.poll()
+        self.last_metrics={'control_wall_ms':(time.perf_counter_ns()-control_start)/1e6,
+                           'prefix_match_allocate_ms':0.0}
 
         # prefill
         num_seqs = 0
         num_batched_tokens = 0
         while self.waiting and num_seqs < self.max_num_seqs:
             seq = self.waiting[0]
-            if num_batched_tokens + len(seq) > self.max_num_batched_tokens or not self.block_manager.can_allocate(seq):
+            probe=time.perf_counter_ns()
+            admissible=self.block_manager.can_allocate(seq)
+            plan=self.block_manager.allocation_plan(seq) if admissible else None
+            self.last_metrics['prefix_match_allocate_ms']+=(time.perf_counter_ns()-probe)/1e6
+            query_tokens=len(seq)-plan['cached_tokens'] if plan else 0
+            if not admissible or (num_batched_tokens+query_tokens>self.max_num_batched_tokens and num_seqs):
                 break
             num_seqs += 1
     
+            probe=time.perf_counter_ns()
             self.block_manager.allocate(seq)
+            self.last_metrics['prefix_match_allocate_ms']+=(time.perf_counter_ns()-probe)/1e6
             num_batched_tokens += len(seq) - seq.num_cached_tokens
             seq.status = SequenceStatus.RUNNING
             self.waiting.popleft()
@@ -122,7 +133,7 @@ class Scheduler:
     def postprocess(self, seqs: list[Sequence], token_ids: list[int]) -> list[bool]:
         for seq, token_id in zip(seqs, token_ids):
             seq.append_token(token_id)
-            if (not seq.ignore_eos and token_id == self.eos) or seq.num_completion_tokens == seq.max_tokens:
+            if (not seq.ignore_eos and token_id == self.eos) or seq.num_completion_tokens == seq.max_tokens or getattr(seq,'force_stop',False):
                 seq.status = SequenceStatus.FINISHED
                 self.block_manager.deallocate(seq)
                 self.running.remove(seq)

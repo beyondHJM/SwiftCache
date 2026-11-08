@@ -20,6 +20,7 @@ class BlockManagerBase:
         self.block_id_to_hash = {}
         self.quiesce = lambda: None  # installed by LLMEngine before requests
         self.events = []
+        self._epoch = 0
 
     def log(self, event, **fields):
         record = dict(event=event, role=self.role, rank=self.config.rank,
@@ -37,6 +38,7 @@ class BlockManagerBase:
         return h.intdigest()
 
     def invalidate(self, block_id):
+        self._epoch += 1
         old = self.block_id_to_hash.pop(block_id, None)
         if old is not None and self.hash_to_block_id.get(old) == block_id:
             del self.hash_to_block_id[old]
@@ -67,10 +69,14 @@ class BlockManagerBase:
             self.invalidate(block_id)
         self.free_block_ids.append(block_id)
 
-    def allocate(self, seq):
-        assert not seq.block_table
+    def allocation_plan(self, seq):
+        """Read-only prefix probe, reusable through admission and allocation."""
+        cached=getattr(seq,'allocation_plan',None)
+        if cached is not None and cached['epoch']==self._epoch:
+            return cached
         h = -1
         miss = False
+        rows=[];matched=0;needed=0
         for i in range(seq.num_blocks):
             tokens = seq.block(i)
             h = self.compute_hash(tokens,h) if len(tokens)==self.block_size else -1
@@ -79,24 +85,45 @@ class BlockManagerBase:
                    self.free_block_ids.owns(candidate) and
                    self.blocks[candidate].token_ids == tokens)
             if hit:
+                matched+=self.block_size
+                needed+=self.blocks[candidate].ref_count==0
+            else:
+                miss=True;needed+=1
+            rows.append((tokens,h,candidate if hit else -1))
+        plan=dict(epoch=self._epoch,rows=rows,cached_tokens=matched,needed_blocks=needed)
+        seq.allocation_plan=plan
+        return plan
+
+    def allocate(self, seq):
+        assert not seq.block_table
+        plan=self.allocation_plan(seq)
+        self._epoch+=1
+        for i,(tokens,h,candidate) in enumerate(plan['rows']):
+            hit=candidate>=0
+            if hit:
                 block = self.blocks[candidate]
                 if block.ref_count:
                     block.ref_count += 1
                 else:
-                    block = self._allocate_block(candidate)
+                    # Claim a cached free block without erasing/rebuilding its hash.
+                    self.free_block_ids.remove(candidate)
+                    block.ref_count=1
+                    self.used_block_ids.add(candidate)
                 seq.num_cached_tokens += self.block_size
             else:
-                miss = True
                 block = self._allocate_block(self.free_block_ids[0])
                 block.hit_count = 0
                 block.prefix_position = i
-            if h != -1:
+            if h != -1 and not hit:
                 self.register_hash(block,h,tokens)
+            if h != -1:
                 block.hit_count += 1
             seq.block_table.append(block.block_id)
         seq.extra_info['prefix_cached'] = seq.num_cached_tokens
+        seq.allocation_plan=None
 
     def deallocate(self, seq):
+        self._epoch+=1
         for block_id in reversed(seq.block_table):
             block = self.blocks[block_id]
             if block.ref_count <= 0:
@@ -132,6 +159,11 @@ class BlockManagerBase:
         self.assert_invariants()
         return dict(role=self.role, free=len(self.free_block_ids), used=len(self.used_block_ids),
                     total=len(self.blocks), events=self.events)
+
+    def maximum_blocks(self):
+        if self.role=='slave' and not self.config.elastic_enabled:
+            return self.free_block_ids.init_block_num
+        return len(self.blocks)
 
     def assert_invariants(self):
         referenced = {b.block_id for b in self.blocks if b.ref_count > 0}
@@ -177,7 +209,14 @@ class MasterBlockManager(BlockManagerBase):
             self.zmq_server.send_dict(ident,dict(op='ready'))
 
     def can_allocate(self, seq):
-        return len(self.free_block_ids) >= seq.num_blocks
+        return len(self.free_block_ids) >= self.allocation_plan(seq)['needed_blocks']
+
+    def maximum_blocks(self):
+        total=len(self.free_block_ids.local_free_block_ids.blocks)
+        for peer in self.peers.values():
+            reserved=peer['worker_unit'] if peer.get('elastic_enabled',True) else peer['reserved']
+            total+=(peer['total']-reserved)//peer['worker_unit']*peer['master_unit']
+        return total
 
     def master_check_blocks_update(self):
         self.poll()
@@ -261,7 +300,8 @@ class SlaveBlockManager(BlockManagerBase):
         self.window=DemandWindow(config.elastic_window_seconds,time.monotonic)
         self.last_check=time.monotonic()
         self.zmq_client.send_dict(dict(op='hello',master_unit=config.master_minimum_scaling_block_count,
-                                      worker_unit=self.unit,reserved=self.free_block_ids.init_block_num,total=len(self.blocks)))
+                                      worker_unit=self.unit,reserved=self.free_block_ids.init_block_num,total=len(self.blocks),
+                                      elastic_enabled=config.elastic_enabled))
         deadline=time.monotonic()+config.control_timeout_seconds
         while True:
             msg=self.zmq_client.recv_dict_nonblock()
@@ -340,9 +380,10 @@ class SlaveBlockManager(BlockManagerBase):
     def can_allocate(self, seq):
         if self.pending:
             return False
-        if len(self.free_block_ids)>=seq.num_blocks:
+        needed=self.allocation_plan(seq)['needed_blocks']
+        if len(self.free_block_ids)>=needed:
             return True
-        need=self.free_block_ids.init_block_num+seq.num_blocks-len(self.free_block_ids)
+        need=self.free_block_ids.init_block_num+needed-len(self.free_block_ids)
         if need<=len(self.blocks):
             self.request_resize(need)
         return False

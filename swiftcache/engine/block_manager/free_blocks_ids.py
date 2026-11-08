@@ -14,12 +14,16 @@ class FreeBlockIdsBase:
         self.minimum_scaling_block_count = max(1, minimum_scaling_block_count)
         self.by_id = {b.block_id: b for b in blocks}
         self._free = set()
+        self._heap_cache=[]
+        self._heap_dirty=True
 
     @property
     def _heap(self):
-        heap = [self.by_id[i] for i in self._free]
-        heapq.heapify(heap)
-        return heap
+        if self._heap_dirty:
+            self._heap_cache=[self.by_id[i] for i in self._free]
+            heapq.heapify(self._heap_cache)
+            self._heap_dirty=False
+        return self._heap_cache
 
     def push(self, block_id):
         if not self.owns(block_id):
@@ -29,6 +33,7 @@ class FreeBlockIdsBase:
         if block_id in self._free:
             raise RuntimeError('Double free')
         self._free.add(block_id)
+        self._heap_dirty=True
 
     append = push
 
@@ -36,10 +41,15 @@ class FreeBlockIdsBase:
         if block_id not in self._free:
             raise RuntimeError(f'Block {block_id} is not free/owned')
         self._free.remove(block_id)
+        if not self._heap_dirty and self._heap_cache and self._heap_cache[0].block_id==block_id:
+            heapq.heappop(self._heap_cache)
+        else:
+            self._heap_dirty=True
         return True
 
     def remove_batch_with_global_id(self, ids):
         self._free.difference_update(ids)
+        self._heap_dirty=True
 
     def __len__(self):
         return len(self._free)
@@ -68,6 +78,7 @@ class MasterFreeBlockIds(FreeBlockIdsBase):
         ids = set(range(self.offset + self.init_block_num, self.offset + target))
         self.draining.update(ids)
         self._free.difference_update(ids)
+        self._heap_dirty=True
         return ids
 
     def set_reserved(self, target):
@@ -86,6 +97,7 @@ class MasterFreeBlockIds(FreeBlockIdsBase):
                 raise RuntimeError('Returned memory is still referenced')
             self._free.update(ids)
         self.init_block_num = target
+        self._heap_dirty=True
         return ids
 
     def scale_down(self, n):
@@ -119,6 +131,7 @@ class SlaveFreeBlockIds(FreeBlockIdsBase):
         else:
             self._free.difference_update(ids)
         self.init_block_num = target
+        self._heap_dirty=True
         return ids
 
 
