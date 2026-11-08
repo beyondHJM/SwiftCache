@@ -62,8 +62,6 @@ def gateway_process(config):
 
 def launch(config):
     config.validate()
-    if os.environ.get("USE_CSCHEDULER", "").lower() in ("1", "true", "yes"):
-        raise ValueError("Unified elastic serving requires the Python scheduler")
     devices = ",".join(str(m.gpu) for m in config.models)
     visible = os.environ.get("CUDA_VISIBLE_DEVICES")
     if visible and visible != devices:
@@ -182,6 +180,7 @@ def parse_config(argv=None):
     parser.add_argument("--model", "-m")
     parser.add_argument("--gpus")
     parser.add_argument("--max-model-len", type=int)
+    parser.add_argument("--scheduler-backend", choices=["python", "cpp"])
     parser.add_argument("--ignore-model-max-length", action="store_true", default=None)
     parser.add_argument("--print-config", action="store_true")
     args = parser.parse_args(argv)
@@ -197,6 +196,8 @@ def parse_config(argv=None):
         for m, gpu in zip(config.models, gpus):
             m.gpu = gpu
     for m in config.models:
+        if args.scheduler_backend is not None:
+            m.engine["scheduler_backend"] = args.scheduler_backend
         if args.model:
             m.model = args.model
         if args.max_model_len is not None:

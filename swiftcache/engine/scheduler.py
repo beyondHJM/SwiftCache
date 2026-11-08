@@ -15,6 +15,7 @@ class SchedulingType(Enum):
     DECODING = "decoding"
 
 class Scheduler:
+    backend = 'python'
 
     def __init__(self, config: Config):
         self.cnt = 0
@@ -129,6 +130,14 @@ class Scheduler:
         seq.status = SequenceStatus.WAITING
         self.block_manager.deallocate(seq)
         self.waiting.appendleft(seq)
+
+    def cancel(self, seq):
+        if seq in self.waiting:
+            self.waiting.remove(seq)
+        if seq in self.running:
+            self.running.remove(seq)
+        if seq.block_table:
+            self.block_manager.deallocate(seq)
 
     def postprocess(self, seqs: list[Sequence], token_ids: list[int]) -> list[bool]:
         for seq, token_id in zip(seqs, token_ids):

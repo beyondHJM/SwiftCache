@@ -14,6 +14,7 @@ import time
 from types import SimpleNamespace
 
 PROFILE = None
+BACKEND = "python"
 
 
 def summary(values):
@@ -26,7 +27,7 @@ def summary(values):
     )
 
 
-def scheduler(pool):
+def scheduler(pool, backend=None):
     from swiftcache.engine.scheduler import Scheduler
     from swiftcache.engine.block_manager.block_manager import (
         BlockManagerBase,
@@ -43,6 +44,7 @@ def scheduler(pool):
         max_num_seqs=8,
         max_num_batched_tokens=1048576,
         num_kvcache_blocks=pool,
+        eos=-123,
     )
     bm = object.__new__(MasterBlockManager)
     BlockManagerBase.__init__(bm, cfg)
@@ -50,6 +52,10 @@ def scheduler(pool):
     bm.free_block_ids = MultiFreeBlockIds(bm.blocks, [0, pool], 0, cfg, [1])
     bm.pending = {}
     bm.zmq_server = SimpleNamespace(recv_all_dict_nonblock=lambda: [])
+    if (backend or BACKEND) == "cpp":
+        from swiftcache.engine.native_scheduler import Scheduler as NativeScheduler
+
+        return NativeScheduler.from_block_manager(bm, cfg)
     obj = object.__new__(Scheduler)
     obj.cnt = 0
     obj.config = cfg
@@ -86,6 +92,9 @@ def run_case(total, uncached, pool, samples, rounds, warmups):
             s.postprocess(seqs, [7])
         measured = dict(
             construct_ms=[],
+            enqueue_ms=[],
+            cleanup_ms=[],
+            lifecycle_ms=[],
             schedule_wall_ms=[],
             schedule_cpu_ms=[],
             prefix_allocate_ms=[],
@@ -113,7 +122,9 @@ def run_case(total, uncached, pool, samples, rounds, warmups):
             start = time.perf_counter_ns()
             seq = Sequence(tokens, SamplingParams(temperature=0, max_tokens=1))
             construct = (time.perf_counter_ns() - start) / 1e6
+            start = time.perf_counter_ns()
             s.add(seq)
+            enqueue = (time.perf_counter_ns() - start) / 1e6
             subtotal[0] = 0
             wall = time.perf_counter_ns()
             cpu = time.thread_time_ns()
@@ -130,6 +141,13 @@ def run_case(total, uncached, pool, samples, rounds, warmups):
             start = time.perf_counter_ns()
             s.postprocess(seqs, [7])
             post = (time.perf_counter_ns() - start) / 1e6
+            # Do not charge destruction of the previous request to the next
+            # schedule() assignment. Keep retirement visible as its own stage.
+            start = time.perf_counter_ns()
+            seqs = None
+            seq = None
+            tokens = None
+            cleanup = (time.perf_counter_ns() - start) / 1e6
             if PROFILE is not None and i >= warmups:
                 PROFILE.disable()
             if i >= warmups:
@@ -137,8 +155,16 @@ def run_case(total, uncached, pool, samples, rounds, warmups):
                     ("construct_ms", construct),
                     ("schedule_wall_ms", wall_ms),
                     ("schedule_cpu_ms", cpu_ms),
-                    ("prefix_allocate_ms", subtotal[0]),
+                    (
+                        "prefix_allocate_ms",
+                        s.last_metrics["prefix_match_allocate_ms"]
+                        if BACKEND == "cpp"
+                        else subtotal[0],
+                    ),
                     ("postprocess_ms", post),
+                    ("enqueue_ms", enqueue),
+                    ("cleanup_ms", cleanup),
+                    ("lifecycle_ms", construct + enqueue + wall_ms + post + cleanup),
                 ]:
                     measured[key].append(value)
         s.block_manager.assert_invariants()
@@ -219,10 +245,13 @@ def queue_probe():
                 seqs, kind = s.schedule()
                 assert seqs and kind == "prefill"
                 s.postprocess(seqs, [7] * len(seqs))
+            seqs = None
+            tokens = None
         s.block_manager.assert_invariants()
         output.append(
             dict(
                 waiting_requests=count,
+                previous_request_retirement_outside_clock=True,
                 samples=20,
                 warmups=5,
                 first_call_ms=summary(times),
@@ -235,6 +264,7 @@ def queue_probe():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--backend", choices=["python", "cpp"], default="python")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--suite",
@@ -244,7 +274,8 @@ def main():
     parser.add_argument("--profile-output", type=Path)
     args = parser.parse_args()
     sys.path.insert(0, str(args.source.resolve()))
-    global PROFILE
+    global PROFILE, BACKEND
+    BACKEND = args.backend
     if args.profile_output:
         import cProfile
 
@@ -276,7 +307,9 @@ def main():
                 dict(
                     cpu_metadata_only=True,
                     independent_token_objects=True,
+                    request_retirement_measured_separately=True,
                     source=str(args.source),
+                    backend=BACKEND,
                     cases=cases,
                     admission=admission_probe(),
                 ),

@@ -3,3 +3,8 @@ __pycache__/
 .venv/
 artifacts/
 *.log
+# Native extensions must be rebuilt for the target Python/ABI.
+/build/
+*.egg-info/
+/swiftcache/engine/_native_scheduler*.so
+/swiftcache/engine/_native_scheduler*.pyd

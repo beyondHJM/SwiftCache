@@ -60,8 +60,11 @@ class ServiceConfig:
             "control_timeout_seconds",
             "enforce_eager",
             "tensor_parallel_size",
+            "scheduler_backend",
         }
         for m in self.models:
+            if m.engine.get("scheduler_backend", "python") not in ("python", "cpp"):
+                raise ValueError("scheduler_backend must be python or cpp")
             if m.role not in ("master", "slave") or m.gpu < 0 or not m.name:
                 raise ValueError("Invalid model role, GPU or name")
             m.model = os.path.expandvars(os.path.expanduser(m.model))

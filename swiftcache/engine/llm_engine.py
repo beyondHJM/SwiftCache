@@ -14,14 +14,8 @@ import torch.distributed as dist
 from multiprocessing.shared_memory import SharedMemory
 from swiftcache.config import Config
 from swiftcache.sampling_params import SamplingParams
-from swiftcache.engine.sequence import sequence_cpp_to_py
-if USE_CSCHEDULER:
-    print("使用c++编写的scheduler!")
-    from swiftcache.engine.c_scheduler import Scheduler, Sequence
-else:
-    print("使用python编写的scheduler!")
-    from swiftcache.engine.scheduler import Scheduler
-    from swiftcache.engine.sequence import Sequence
+from swiftcache.engine.sequence import Sequence
+from swiftcache.engine.scheduler_factory import get_scheduler_class
 
 from swiftcache.engine.model_runner import ModelRunner
 from swiftcache.engine.external_kvcache import ExternalKVCacheManager
@@ -41,7 +35,10 @@ class LLMEngine:
         print("start init")
         config_fields = {field.name for field in fields(Config)}
         config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+        if USE_CSCHEDULER and 'scheduler_backend' not in config_kwargs:
+            config_kwargs['scheduler_backend'] = 'cpp'
         config = Config(model, **config_kwargs)
+        scheduler_class = get_scheduler_class(config.scheduler_backend)
         self.config = config
         self.seqs_in_scheduler = {}
         self.request_dict = {}
@@ -64,7 +61,7 @@ class LLMEngine:
         self.tokenizer = AutoTokenizer.from_pretrained(config.model, use_fast=True)
         config.eos = self.tokenizer.eos_token_id
         print(f"{config.role}{config.rank}调度器开始创建")
-        self.scheduler = Scheduler(config)
+        self.scheduler = scheduler_class(config)
         self.scheduler.block_manager.quiesce = self.model_runner.quiesce
         print(f"{config.role}{config.rank}调度器创建成功")
         # time.sleep(5)
@@ -138,6 +135,7 @@ class LLMEngine:
         p1=time.perf_counter_ns()
         self.batch_counter+=1
         metric=dict(batch_id=self.batch_counter,is_prefill=is_prefill,
+            scheduler_backend=self.config.scheduler_backend,
             schedule_wall_ms=(scheduled-t0)/1e6,schedule_cpu_ms=(cpu1-cpu0)/1e6,
             postprocess_wall_ms=(p1-p0)/1e6,**getattr(self.scheduler,'last_metrics',{}),
             **getattr(self.model_runner,'last_run_metrics',{}))
@@ -267,9 +265,7 @@ class LLMEngine:
     def cancel_request(self,request_id):
         seq=self.seqs_in_scheduler.pop(request_id,None)
         if seq is not None:
-            if seq in self.scheduler.waiting: self.scheduler.waiting.remove(seq)
-            if seq in self.scheduler.running: self.scheduler.running.remove(seq)
-            if seq.block_table: self.scheduler.block_manager.deallocate(seq)
+            self.scheduler.cancel(seq)
         req=self.request_dict.pop(request_id,None)
         if req is not None:
             req.cancelled=True;req.finished_event.set()

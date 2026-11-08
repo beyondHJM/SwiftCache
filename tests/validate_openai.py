@@ -1,6 +1,7 @@
 """Live dual-Qwen tests using the official SDK and LangChain ChatOpenAI."""
 
 import asyncio
+import argparse
 import json
 from pathlib import Path
 import time
@@ -24,6 +25,11 @@ def wait_ready():
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/phase2/openai-validation.json")
+    )
+    args = parser.parse_args()
     wait_ready()
     records = []
     client = OpenAI(base_url=URL + "/v1", api_key="local", max_retries=0, timeout=120)
@@ -216,7 +222,8 @@ def main():
         time.sleep(0.1)
     else:
         raise AssertionError(("Cancelled stream retained state", state))
-    Path("artifacts/phase2/openai-validation.json").write_text(
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
         json.dumps(
             dict(
                 tests=records,

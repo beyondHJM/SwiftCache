@@ -289,6 +289,7 @@ def make_app(llm, instance, config):
             original_context_limit=llm.config.original_model_max_length,
             ignore_model_max_length=llm.config.ignore_model_max_length,
             regular_cache_blocks=llm.config.local_num_blocks,
+            scheduler_backend=llm.scheduler.backend,
         )
         state["maximum_usable_blocks"] = llm.scheduler.block_manager.maximum_blocks()
         return state

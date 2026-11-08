@@ -49,8 +49,11 @@ class Config:
     ignore_model_max_length: bool = False
     warmup_tokens: int = 2048
     profile_stages: bool = False
+    scheduler_backend: str = 'python'
 
     def __post_init__(self):
+        if self.scheduler_backend not in ('python', 'cpp'):
+            raise ValueError('scheduler_backend must be python or cpp')
         assert os.path.isdir(self.model)
         assert self.kvcache_block_size % 256 == 0
         assert 1 <= self.tensor_parallel_size <= 8
