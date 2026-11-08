@@ -79,6 +79,10 @@ Together, these two mechanisms allow SwiftCache to:
 
 ## Unified serving and OpenAI clients
 
+An optional [C++17 scheduler](docs/cpp-scheduler.md) now shares the elastic control
+protocol and OpenAI service. Build with `bash scripts/build_cpp_scheduler.sh`,
+then select `--scheduler-backend cpp`. See the [measured comparison](docs/cpp-scheduler-results-2026-11-08.md).
+
 The canonical startup is now configuration driven:
 
 ```bash

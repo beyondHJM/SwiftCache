@@ -34,7 +34,8 @@ paths resolve against the YAML directory. CLI `--model` overrides all model
 paths; `--gpus 0,1` overrides their GPUs. A master and each worker currently need
 separate GPUs, TP=1 and eager execution. One master with multiple worker entries
 can be described, but this release's GPU validation uses one master and one
-worker. Do not enable the old C++ scheduler for this control protocol.
+worker. The optional [C++ scheduler](cpp-scheduler.md) supports this same control
+protocol; select it with `--scheduler-backend cpp` after building the extension.
 
 ```bash
 .venv/bin/python -m server.starter --config configs/two_qwen8b.yaml --print-config
