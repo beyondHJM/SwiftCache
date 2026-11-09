@@ -14,14 +14,8 @@ import torch.distributed as dist
 from multiprocessing.shared_memory import SharedMemory
 from swiftcache.config import Config
 from swiftcache.sampling_params import SamplingParams
-from swiftcache.engine.sequence import sequence_cpp_to_py
-if USE_CSCHEDULER:
-    print("使用c++编写的scheduler!")
-    from swiftcache.engine.c_scheduler import Scheduler, Sequence
-else:
-    print("使用python编写的scheduler!")
-    from swiftcache.engine.scheduler import Scheduler
-    from swiftcache.engine.sequence import Sequence
+from swiftcache.engine.sequence import Sequence
+from swiftcache.engine.scheduler_factory import get_scheduler_class
 
 from swiftcache.engine.model_runner import ModelRunner
 from swiftcache.engine.external_kvcache import ExternalKVCacheManager
@@ -41,9 +35,14 @@ class LLMEngine:
         print("start init")
         config_fields = {field.name for field in fields(Config)}
         config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+        if USE_CSCHEDULER and 'scheduler_backend' not in config_kwargs:
+            config_kwargs['scheduler_backend'] = 'cpp'
         config = Config(model, **config_kwargs)
+        scheduler_class = get_scheduler_class(config.scheduler_backend)
         self.config = config
         self.seqs_in_scheduler = {}
+        self.request_dict = {}
+        self.batch_counter = 0
         # self.num_external_kvcache = global_config['num_external_kvcache']
         vl_chat_processor = init_vl_processor(model)
         self.is_vision_language = vl_chat_processor is not None 
@@ -62,7 +61,8 @@ class LLMEngine:
         self.tokenizer = AutoTokenizer.from_pretrained(config.model, use_fast=True)
         config.eos = self.tokenizer.eos_token_id
         print(f"{config.role}{config.rank}调度器开始创建")
-        self.scheduler = Scheduler(config)
+        self.scheduler = scheduler_class(config)
+        self.scheduler.block_manager.quiesce = self.model_runner.quiesce
         print(f"{config.role}{config.rank}调度器创建成功")
         # time.sleep(5)
         self.warm_up()
@@ -72,7 +72,7 @@ class LLMEngine:
         print("end init")
 
     def exit(self):
-        if global_config['kv_cache_strategy'] == 'external_gpu':
+        if global_config['kv_cache_strategy'] == 'external_gpu' and self.config.role == 'master':
             self.model_runner.controller.exit()
         self.model_runner.call("exit")
         del self.model_runner
@@ -95,11 +95,11 @@ class LLMEngine:
             if isinstance(prompt, str):
                 prompt = self.tokenizer.encode(prompt)
                 
-            if len(prompt) > self.tokenizer.model_max_length:
-                orig_len = len(prompt)
-                max_len = self.tokenizer.model_max_length
-                prompt = prompt[-max_len:]
-                print(f"[Warning] Prompt length {orig_len} exceeds the maximum limit ({max_len}). Truncated to the last {max_len} characters.")
+            if not prompt or len(prompt)+sampling_params.max_tokens>self.config.max_model_len:
+                raise ValueError('Request exceeds runtime context limit')
+            capacity=self.scheduler.block_manager.maximum_blocks()*self.config.kvcache_block_size
+            if len(prompt)+sampling_params.max_tokens-1>capacity:
+                raise ValueError('Request exceeds maximum usable KV capacity')
             seq = Sequence(prompt, sampling_params)
         self.scheduler.add(seq)
         self.seqs_in_scheduler[seq.seq_id] = seq
@@ -108,65 +108,60 @@ class LLMEngine:
    
 
     def step(self):
-        # t1= perf_counter()
-        t = perf_counter()
-        seqs, scheduling_type = self.scheduler.schedule()
-        
-        if USE_CSCHEDULER:
-            seqs_py = sequence_cpp_to_py(seqs)
-        print(f'{self.config.role} scheduler时间:{(perf_counter()-t)*1000:.3f} ms')
-            # for seq in seqs:
-            #     self.seqs_in_scheduler[seq.seq_id] = seq
-
-        # print('scheduled success!',scheduling_type)
-        # print(json.dumps(self.scheduler.block_manager.hash_to_block_id,indent = ' '))
-        # print('scheudler time usage:',perf_counter()-t)
-
-        # if scheduling_type is SchedulingType.IMAGE_PROCESSING:
-
-        #     assert len(seqs) == 1 , "Number of sequences must be 1 in the phase for image processing."
-        #     seq = seqs[0]
-        #     prepare_inputs = self.model_runner.image_process(seq)
-        #     seq = VisionSequence(prepare_inputs = prepare_inputs,status = VisionStatus.ENCODING,sampling_params=seq.sampling_params)
-        #     seq.time_usage.append(perf_counter()-t)
-        #     self.scheduler.add(seq)
-        #     return prepare_inputs, None , scheduling_type
-
-        # elif scheduling_type is SchedulingType.VISION_ENCODING:
-        #     assert len(seqs) == 1, "Number of sequences must be 1 in the phase for vision encoding."
-        #     seq  = seqs[0]
-        #     prepare_inputs = seq.prepare_inputs.to('cuda:0')
-        #     input_embeds = self.model_runner.prepare_inputs_embeds(prepare_inputs)
-        #     input_embeds = input_embeds.view(-1, input_embeds.size(-1))
-        #     seq.time_usage.append(perf_counter()-t)
-        #     time_usage = seq.time_usage
-        #     seq = Sequence(token_ids = self.prepare_token_ids(input_embeds), sampling_params=seq.sampling_params, input_embeds = input_embeds)
-        #     seq.time_usage = time_usage
-        #     self.scheduler.add(seq)
-        #     return None, None , scheduling_type
-        # print(f"xxxxx:{scheduling_type == SchedulingType.PREFILL or scheduling_type == SchedulingType.DECODING}")
-        # print(scheduling_type, "prefill", "decoding")
-        if scheduling_type == "prefill" or scheduling_type == "decoding":
-
-            is_prefill = True if scheduling_type == "prefill" else False
-            if USE_CSCHEDULER:
-                token_ids = self.model_runner.call("run", seqs_py, is_prefill)
-            else:
-                token_ids = self.model_runner.call("run", seqs, is_prefill)
-            t2 = perf_counter()
-            self.scheduler.postprocess(seqs, token_ids)
-            end_time = perf_counter()
-            # print(f"postprocess:{(end_time-t2)*1000:.3f} ms")
-            # 这部分可以用c++
-            for seq in seqs:
-                seq.time_usage_append(end_time - t)
+        t0=time.perf_counter_ns();cpu0=time.thread_time_ns()
+        seqs,kind=self.scheduler.schedule()
+        scheduled=time.perf_counter_ns();cpu1=time.thread_time_ns()
+        if not seqs: return [],0
+        is_prefill=kind=='prefill'
+        token_ids=self.model_runner.call('run',seqs,is_prefill)
+        for seq,token in zip(seqs,token_ids):
+            req=self.request_dict.get(seq.seq_id)
+            if req is None: continue
+            if is_prefill and 'first_cached_tokens' not in req.metrics:
+                req.metrics['first_cached_tokens']=min(seq.num_cached_tokens,seq.num_prompt_tokens)
+                req.prefix_cached=req.metrics['first_cached_tokens']
+            generated=seq.completion_token_ids+[token]
+            text=self.tokenizer.decode(generated,skip_special_tokens=True,clean_up_tokenization_spaces=False)
+            positions=[text.find(stop) for stop in req.stop if stop in text]
+            if positions:
+                text=text[:min(positions)];seq.force_stop=True;req.finish_reason='stop'
+            elif not seq.ignore_eos and token==self.config.eos:
+                req.finish_reason='stop'
+            elif len(generated)>=seq.max_tokens:
+                req.finish_reason='length'
+            req.visible_text=text
+        p0=time.perf_counter_ns()
+        self.scheduler.postprocess(seqs,token_ids)
+        p1=time.perf_counter_ns()
+        self.batch_counter+=1
+        metric=dict(batch_id=self.batch_counter,is_prefill=is_prefill,
+            scheduler_backend=self.config.scheduler_backend,
+            schedule_wall_ms=(scheduled-t0)/1e6,schedule_cpu_ms=(cpu1-cpu0)/1e6,
+            postprocess_wall_ms=(p1-p0)/1e6,**getattr(self.scheduler,'last_metrics',{}),
+            **getattr(self.model_runner,'last_run_metrics',{}))
+        for seq,token in zip(seqs,token_ids):
+            seq.time_usage_append((p1-t0)/1e9)
+            req=self.request_dict.get(seq.seq_id)
+            if req is not None:
+                req.output_token_ids=seq.completion_token_ids
+                req.metrics['batches'].append(metric)
+                req.metrics.setdefault('first_token_ns',time.perf_counter_ns())
+                text=req.visible_text
+                if not seq.is_finished:
+                    # Hold stop-string prefixes and incomplete UTF-8 characters.
+                    hold=max((n for stop in req.stop for n in range(1,len(stop)) if text.endswith(stop[:n])),default=0)
+                    if hold: text=text[:-hold]
+                    text=text.rstrip('\ufffd')
+                if req.streaming:
+                    req.stream_queue.put_nowait(dict(text=text,finished=seq.is_finished))
                 if seq.is_finished:
-                    del self.seqs_in_scheduler[seq.seq_id]
-
-
-            outputs = [(seq.seq_id, seq.completion_token_ids,seq.time_usage,seq.extra_info) for seq in seqs if seq.is_finished]
-            num_tokens = sum(len(seq) for seq in seqs) if is_prefill else -len(seqs)
-            return outputs, num_tokens
+                    req.output=req.visible_text;req.time_usage=seq.time_usage
+                    req.metrics['finished_ns']=time.perf_counter_ns()
+                    req.finished_event.set()
+            if seq.is_finished:
+                self.seqs_in_scheduler.pop(seq.seq_id,None)
+        outputs=[(seq.seq_id,seq.completion_token_ids,seq.time_usage,seq.extra_info) for seq in seqs if seq.is_finished]
+        return outputs,sum(len(seq) for seq in seqs) if is_prefill else -len(seqs)
 
     def is_finished(self):
         return self.scheduler.is_finished()
@@ -254,44 +249,47 @@ class LLMEngine:
         #     self.test()
 
     async def _main_event_loop(self):
-        cnt = 1
         while True:
-            while not self.is_finished():
-                output, num_tokens = self.step()
-                # if scheduling_type in [SchedulingType.IMAGE_PROCESSING,SchedulingType.VISION_ENCODING]:
-                #     print("not implement",scheduling_type)
-                for seq_id, token_ids,time_usage,extra_info in output:
-                    req = self.request_dict[seq_id]
-                    req.output_token_ids = token_ids
-                    req.finished_event.set()
-                    req.time_usage = time_usage
-                    req.prefix_cached = extra_info.get('prefix_cached',-1)
+            self.scheduler.block_manager.poll()
+            if not self.is_finished():
+                try:
+                    _,tokens=self.step()
+                except Exception as exc:
+                    for req in self.request_dict.values():
+                        req.error=str(exc);req.finished_event.set()
+                    raise
+                await asyncio.sleep(0 if tokens else .001)
+            else:
+                await asyncio.sleep(.001)
 
-            await asyncio.sleep(0.001)
-            cnt+=1
-            
+    def cancel_request(self,request_id):
+        seq=self.seqs_in_scheduler.pop(request_id,None)
+        if seq is not None:
+            self.scheduler.cancel(seq)
+        req=self.request_dict.pop(request_id,None)
+        if req is not None:
+            req.cancelled=True;req.finished_event.set()
+
     async def process_request(self,req:Request):
-        prompt = req.prompt
-        temperature = req.temperature
-        max_tokens = req.max_tokens
-        finished_event = req.finished_event
-        if req.token_ids is None:
-            token_ids = self.tokenizer.encode(prompt)
-            if len(token_ids)>10000:
-                print(f'large token ids : {len(token_ids)}')
-            req.token_ids = token_ids
-        else:
-            token_ids = req.token_ids
-            prompt = self.tokenizer.decode(token_ids)
-        sampling_params = SamplingParams(temperature,max_tokens,req.ignore_eos)
-        request_id = req.request_id
-        seq = Sequence(token_ids,sampling_params,seq_id = request_id)
-        self.request_dict[request_id] = req
+        begin=time.perf_counter_ns()
+        token_ids=req.token_ids if req.token_ids is not None else self.tokenizer.encode(req.prompt)
+        req.metrics['tokenize_wall_ms']=(time.perf_counter_ns()-begin)/1e6
+        req.token_ids=token_ids
+        if not token_ids or req.max_tokens<=0 or len(token_ids)+req.max_tokens>self.config.max_model_len:
+            raise ValueError('Request must be nonempty and fit runtime context limit including output')
+        capacity=self.scheduler.block_manager.maximum_blocks()*self.config.kvcache_block_size
+        if len(token_ids)+req.max_tokens-1>capacity:
+            raise ValueError('Request exceeds physical KV capacity')
+        sampling=SamplingParams(req.temperature,req.max_tokens,req.ignore_eos,req.top_p)
+        seq=Sequence(token_ids,sampling,seq_id=req.request_id)
+        req.metrics['enqueue_ns']=time.perf_counter_ns()
+        self.request_dict[req.request_id]=req
+        self.seqs_in_scheduler[seq.seq_id]=seq
         self.scheduler.add(seq)
-        self.seqs_in_scheduler[seq.seq_id] = seq
-        # print(f'add success!,seq_id:{seq.seq_id}')
-        await finished_event.wait()
-        req.output = self.tokenizer.decode(req.output_token_ids)
-        self.request_dict[request_id]=None
-        #TODO
-        
+        try:
+            await req.finished_event.wait()
+            if req.cancelled: raise asyncio.CancelledError()
+            if getattr(req,'error',None): raise RuntimeError(req.error)
+        finally:
+            if not req.finished_event.is_set(): self.cancel_request(req.request_id)
+            self.request_dict.pop(req.request_id,None)

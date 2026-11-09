@@ -1,0 +1,1973 @@
+{
+  "unit_tests": 35,
+  "actual_single_gpu_model_reference_matches_per_backend": 11,
+  "actual_two_gpu_cpp_model_reference_matches": 11,
+  "two_gpu_context_limit": 8192,
+  "two_gpu_cache_blocks": 32,
+  "elastic_cycles": 12,
+  "resize_applied": 56,
+  "active_reclaims": 3,
+  "openai_official_sdk": true,
+  "langchain": true,
+  "cancellation_clean": true,
+  "boundary_cases": 3,
+  "queued_master_seconds": 3.3036684058606625,
+  "final_master": {
+    "role": "master",
+    "free": 31,
+    "used": 0,
+    "total": 32,
+    "events": [
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131745.0727637,
+        "request_id": 1,
+        "target": 2,
+        "active_blocks": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131745.1507483,
+        "request_id": 1,
+        "old": 1,
+        "reserved": 2,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131745.1544065,
+        "request_id": 2,
+        "old": 2,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131751.5655563,
+        "request_id": 3,
+        "target": 3,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131751.5657175,
+        "request_id": 3,
+        "old": 1,
+        "reserved": 3,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131756.0228322,
+        "request_id": 4,
+        "old": 3,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131756.745246,
+        "request_id": 5,
+        "target": 6,
+        "active_blocks": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131761.3664865,
+        "request_id": 5,
+        "old": 1,
+        "reserved": 6,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131761.7628732,
+        "request_id": 6,
+        "old": 6,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131766.7248957,
+        "request_id": 7,
+        "target": 6,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131766.7250285,
+        "request_id": 7,
+        "old": 1,
+        "reserved": 6,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131769.7578595,
+        "request_id": 8,
+        "old": 6,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131770.5750039,
+        "request_id": 9,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131770.575134,
+        "request_id": 9,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131773.572808,
+        "request_id": 10,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131780.218771,
+        "request_id": 11,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131780.2189355,
+        "request_id": 11,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131783.2739947,
+        "request_id": 12,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131784.0151434,
+        "request_id": 13,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131784.0152817,
+        "request_id": 13,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131787.0893068,
+        "request_id": 14,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131793.412118,
+        "request_id": 15,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131793.4122791,
+        "request_id": 15,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131796.4997203,
+        "request_id": 16,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131797.2107117,
+        "request_id": 17,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131797.2108324,
+        "request_id": 17,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131800.3000002,
+        "request_id": 18,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131806.9281414,
+        "request_id": 19,
+        "target": 7,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131806.9282856,
+        "request_id": 19,
+        "old": 1,
+        "reserved": 7,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131809.995126,
+        "request_id": 20,
+        "old": 7,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131810.7532256,
+        "request_id": 21,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131810.7533555,
+        "request_id": 21,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131813.7791274,
+        "request_id": 22,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131820.6466284,
+        "request_id": 23,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131820.6468434,
+        "request_id": 23,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131823.6581511,
+        "request_id": 24,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131824.788395,
+        "request_id": 25,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131824.7886114,
+        "request_id": 25,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131827.8636947,
+        "request_id": 26,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131835.6825526,
+        "request_id": 27,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131835.6826952,
+        "request_id": 27,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131838.7102208,
+        "request_id": 28,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131839.3023484,
+        "request_id": 29,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131839.3024974,
+        "request_id": 29,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131842.3474276,
+        "request_id": 30,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131849.4911716,
+        "request_id": 31,
+        "target": 8,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131849.4913518,
+        "request_id": 31,
+        "old": 1,
+        "reserved": 8,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131852.5143995,
+        "request_id": 32,
+        "old": 8,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131853.2612066,
+        "request_id": 33,
+        "target": 9,
+        "active_blocks": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131858.0450084,
+        "request_id": 33,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131858.5737169,
+        "request_id": 34,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131863.5496228,
+        "request_id": 35,
+        "target": 9,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131863.5499964,
+        "request_id": 35,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131866.5801933,
+        "request_id": 36,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131867.409874,
+        "request_id": 37,
+        "target": 9,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131867.4100113,
+        "request_id": 37,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131870.4954495,
+        "request_id": 38,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131876.7346413,
+        "request_id": 39,
+        "target": 9,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131876.7347605,
+        "request_id": 39,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131879.7991674,
+        "request_id": 40,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131880.6627388,
+        "request_id": 41,
+        "target": 9,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131880.662927,
+        "request_id": 41,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131883.6860254,
+        "request_id": 42,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131890.782249,
+        "request_id": 43,
+        "target": 9,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131890.7823763,
+        "request_id": 43,
+        "old": 1,
+        "reserved": 9,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131893.8181598,
+        "request_id": 44,
+        "old": 9,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131894.642985,
+        "request_id": 45,
+        "target": 10,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131894.6431186,
+        "request_id": 45,
+        "old": 1,
+        "reserved": 10,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131897.7083948,
+        "request_id": 46,
+        "old": 10,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131904.8580778,
+        "request_id": 47,
+        "target": 10,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131904.858218,
+        "request_id": 47,
+        "old": 1,
+        "reserved": 10,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131907.864272,
+        "request_id": 48,
+        "old": 10,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131908.7438297,
+        "request_id": 49,
+        "target": 10,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131908.743982,
+        "request_id": 49,
+        "old": 1,
+        "reserved": 10,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131911.7824929,
+        "request_id": 50,
+        "old": 10,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131918.1420412,
+        "request_id": 51,
+        "target": 10,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131918.1422231,
+        "request_id": 51,
+        "old": 1,
+        "reserved": 10,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131921.2111573,
+        "request_id": 52,
+        "old": 10,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131926.588757,
+        "request_id": 53,
+        "target": 2,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131926.5889525,
+        "request_id": 53,
+        "old": 1,
+        "reserved": 2,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131930.9226708,
+        "request_id": 54,
+        "old": 2,
+        "reserved": 1,
+        "worker": "slave1"
+      },
+      {
+        "event": "reclaim_pending",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131931.0792167,
+        "request_id": 55,
+        "target": 32,
+        "active_blocks": 0,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131931.079402,
+        "request_id": 55,
+        "old": 1,
+        "reserved": 32,
+        "worker": "slave1"
+      },
+      {
+        "event": "resize_committed",
+        "role": "master",
+        "rank": 0,
+        "time": 1794131935.2287765,
+        "request_id": 56,
+        "old": 32,
+        "reserved": 1,
+        "worker": "slave1"
+      }
+    ],
+    "worker_reserved": {
+      "slave1": 1
+    },
+    "pending": 0,
+    "draining": 0,
+    "request_records": 0,
+    "scheduled_requests": 0,
+    "context_limit": 8192,
+    "original_context_limit": 40960,
+    "ignore_model_max_length": false,
+    "regular_cache_blocks": 0,
+    "scheduler_backend": "cpp",
+    "maximum_usable_blocks": 31
+  },
+  "final_worker": {
+    "role": "slave",
+    "free": 1,
+    "used": 0,
+    "total": 32,
+    "events": [
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131745.0037644,
+        "request_id": 1,
+        "old": 1,
+        "target": 2
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131745.1525068,
+        "request_id": 1,
+        "old": 1,
+        "reserved": 2
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131745.1529508,
+        "request_id": 2,
+        "old": 2,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131745.155506,
+        "request_id": 2,
+        "old": 2,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131751.5649204,
+        "request_id": 3,
+        "old": 1,
+        "target": 3
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131751.5662088,
+        "request_id": 3,
+        "old": 1,
+        "reserved": 3
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131756.0215037,
+        "request_id": 4,
+        "old": 3,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131756.0239117,
+        "request_id": 4,
+        "old": 3,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131756.673302,
+        "request_id": 5,
+        "old": 1,
+        "target": 6
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131761.3675222,
+        "request_id": 5,
+        "old": 1,
+        "reserved": 6
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131761.7622786,
+        "request_id": 6,
+        "old": 6,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131761.763644,
+        "request_id": 6,
+        "old": 6,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131766.723965,
+        "request_id": 7,
+        "old": 1,
+        "target": 6
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131766.725476,
+        "request_id": 7,
+        "old": 1,
+        "reserved": 6
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131769.7565024,
+        "request_id": 8,
+        "old": 6,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131769.7588966,
+        "request_id": 8,
+        "old": 6,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131770.5054545,
+        "request_id": 9,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131770.576055,
+        "request_id": 9,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131773.5695236,
+        "request_id": 10,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131773.5735407,
+        "request_id": 10,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131780.2175822,
+        "request_id": 11,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131780.2201111,
+        "request_id": 11,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131783.272933,
+        "request_id": 12,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131783.2752979,
+        "request_id": 12,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131783.951124,
+        "request_id": 13,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131784.0166903,
+        "request_id": 13,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131787.0864322,
+        "request_id": 14,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131787.0898933,
+        "request_id": 14,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131793.411578,
+        "request_id": 15,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131793.412922,
+        "request_id": 15,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131796.498077,
+        "request_id": 16,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131796.5003824,
+        "request_id": 16,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131797.1464825,
+        "request_id": 17,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131797.2117128,
+        "request_id": 17,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131800.2537262,
+        "request_id": 18,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131800.3004827,
+        "request_id": 18,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131806.9271522,
+        "request_id": 19,
+        "old": 1,
+        "target": 7
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131806.9285374,
+        "request_id": 19,
+        "old": 1,
+        "reserved": 7
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131809.9928567,
+        "request_id": 20,
+        "old": 7,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131809.9962718,
+        "request_id": 20,
+        "old": 7,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131810.680647,
+        "request_id": 21,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131810.7540536,
+        "request_id": 21,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131813.7765422,
+        "request_id": 22,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131813.7803087,
+        "request_id": 22,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131820.6451533,
+        "request_id": 23,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131820.6479464,
+        "request_id": 23,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131823.65651,
+        "request_id": 24,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131823.6590178,
+        "request_id": 24,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131824.6661422,
+        "request_id": 25,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131824.8126473,
+        "request_id": 25,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131827.778101,
+        "request_id": 26,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131827.8659132,
+        "request_id": 26,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131835.6816459,
+        "request_id": 27,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131835.682912,
+        "request_id": 27,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131838.7082372,
+        "request_id": 28,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131838.7106864,
+        "request_id": 28,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131839.231555,
+        "request_id": 29,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131839.3053348,
+        "request_id": 29,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131842.266229,
+        "request_id": 30,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131842.3481436,
+        "request_id": 30,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131849.4897633,
+        "request_id": 31,
+        "old": 1,
+        "target": 8
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131849.49252,
+        "request_id": 31,
+        "old": 1,
+        "reserved": 8
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131852.513693,
+        "request_id": 32,
+        "old": 8,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131852.515028,
+        "request_id": 32,
+        "old": 8,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131853.198561,
+        "request_id": 33,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131858.0465975,
+        "request_id": 33,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131858.5708673,
+        "request_id": 34,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131858.5742903,
+        "request_id": 34,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131863.5480418,
+        "request_id": 35,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131863.5508258,
+        "request_id": 35,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131866.5776868,
+        "request_id": 36,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131866.5814743,
+        "request_id": 36,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131867.3473773,
+        "request_id": 37,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131867.4104707,
+        "request_id": 37,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131870.4696133,
+        "request_id": 38,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131870.496959,
+        "request_id": 38,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131876.7338412,
+        "request_id": 39,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131876.735098,
+        "request_id": 39,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131879.7982173,
+        "request_id": 40,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131879.799527,
+        "request_id": 40,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131880.5746655,
+        "request_id": 41,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131880.6638708,
+        "request_id": 41,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131883.6832807,
+        "request_id": 42,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131883.686979,
+        "request_id": 42,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131890.7814949,
+        "request_id": 43,
+        "old": 1,
+        "target": 9
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131890.782858,
+        "request_id": 43,
+        "old": 1,
+        "reserved": 9
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131893.8168237,
+        "request_id": 44,
+        "old": 9,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131893.819177,
+        "request_id": 44,
+        "old": 9,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131894.579703,
+        "request_id": 45,
+        "old": 1,
+        "target": 10
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131894.6452098,
+        "request_id": 45,
+        "old": 1,
+        "reserved": 10
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131897.6198297,
+        "request_id": 46,
+        "old": 10,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131897.7090783,
+        "request_id": 46,
+        "old": 10,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131904.85671,
+        "request_id": 47,
+        "old": 1,
+        "target": 10
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131904.8592322,
+        "request_id": 47,
+        "old": 1,
+        "reserved": 10
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131907.8631868,
+        "request_id": 48,
+        "old": 10,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131907.865532,
+        "request_id": 48,
+        "old": 10,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131908.6503952,
+        "request_id": 49,
+        "old": 1,
+        "target": 10
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131908.745647,
+        "request_id": 49,
+        "old": 1,
+        "reserved": 10
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131911.7681637,
+        "request_id": 50,
+        "old": 10,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131911.7834146,
+        "request_id": 50,
+        "old": 10,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131918.1413007,
+        "request_id": 51,
+        "old": 1,
+        "target": 10
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131918.1428988,
+        "request_id": 51,
+        "old": 1,
+        "reserved": 10
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131921.210118,
+        "request_id": 52,
+        "old": 10,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131921.2124941,
+        "request_id": 52,
+        "old": 10,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131926.5871828,
+        "request_id": 53,
+        "old": 1,
+        "target": 2
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131926.5898645,
+        "request_id": 53,
+        "old": 1,
+        "reserved": 2
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131930.921523,
+        "request_id": 54,
+        "old": 2,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131930.9240434,
+        "request_id": 54,
+        "old": 2,
+        "reserved": 1
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131931.0782342,
+        "request_id": 55,
+        "old": 1,
+        "target": 32
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131931.0839653,
+        "request_id": 55,
+        "old": 1,
+        "reserved": 32
+      },
+      {
+        "event": "resize_requested",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131935.2270072,
+        "request_id": 56,
+        "old": 32,
+        "target": 1
+      },
+      {
+        "event": "resize_applied",
+        "role": "slave",
+        "rank": 1,
+        "time": 1794131935.2294383,
+        "request_id": 56,
+        "old": 32,
+        "reserved": 1
+      }
+    ],
+    "reserved": 1,
+    "pending": false,
+    "request_records": 0,
+    "scheduled_requests": 0,
+    "context_limit": 8192,
+    "original_context_limit": 40960,
+    "ignore_model_max_length": false,
+    "regular_cache_blocks": -1,
+    "scheduler_backend": "cpp",
+    "maximum_usable_blocks": 32
+  },
+  "actual_single_gpu_100k_samples_per_backend": 90,
+  "actual_single_gpu_100k_token_outputs_match": true,
+  "actual_single_gpu_100k_backend_summaries": {
+    "python": {
+      "schedule_wall_ms": {
+        "mean": 6.404293811111111,
+        "p50": 5.4260114999999995,
+        "p95": 9.205622,
+        "max": 15.88834
+      },
+      "model_gpu_span_ms": {
+        "mean": 489.20056796603734,
+        "p50": 489.3302764892578,
+        "p95": 491.63653564453125,
+        "max": 492.7497253417969
+      },
+      "prepare_wall_ms": {
+        "mean": 1.3081483222222223,
+        "p50": 1.1183610000000002,
+        "p95": 2.096123,
+        "max": 3.415493
+      },
+      "postprocess_wall_ms": {
+        "mean": 1.0011812,
+        "p50": 0.8194855000000001,
+        "p95": 1.694879,
+        "max": 2.616487
+      },
+      "engine_request_wall_ms": {
+        "mean": 499.35641132222224,
+        "p50": 499.13907800000004,
+        "p95": 503.910293,
+        "max": 507.43182
+      }
+    },
+    "cpp": {
+      "schedule_wall_ms": {
+        "mean": 0.4749032,
+        "p50": 0.41875700000000005,
+        "p95": 0.770882,
+        "max": 1.177304
+      },
+      "model_gpu_span_ms": {
+        "mean": 499.8853780110677,
+        "p50": 490.8468322753906,
+        "p95": 539.4529418945312,
+        "max": 777.1262817382812
+      },
+      "prepare_wall_ms": {
+        "mean": 1.3328776333333334,
+        "p50": 1.1545429999999999,
+        "p95": 2.142709,
+        "max": 3.886833
+      },
+      "postprocess_wall_ms": {
+        "mean": 1.935947011111111,
+        "p50": 1.8924539999999999,
+        "p95": 3.059731,
+        "max": 3.776123
+      },
+      "engine_request_wall_ms": {
+        "mean": 505.74596606666665,
+        "p50": 496.7688095,
+        "p95": 543.676076,
+        "max": 782.478584
+      }
+    }
+  },
+  "two_gpu_100k_performance_retested": false,
+  "test_server_stopped": true,
+  "gpu_after_tests": "0, 425 MiB, 0 %\n1, 12925 MiB, 0 %\n2, 12933 MiB, 0 %\n3, 8281 MiB, 59 %\n"
+}

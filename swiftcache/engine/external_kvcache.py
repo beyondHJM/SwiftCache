@@ -14,6 +14,16 @@ from swiftcache.global_config import global_config
 from torch.cuda.nvtx import range_push,range_pop
 import threading
 import glob
+from pathlib import Path
+
+def runtime_dir():
+    path=Path(os.environ.get('SWIFTCACHE_RUNTIME_DIR','/tmp/swiftcache-runtime'))
+    path.mkdir(parents=True,exist_ok=True)
+    return path
+
+def shm_name():
+    return os.environ.get('SWIFTCACHE_SHM_NAME','swiftcache_kvcache')
+
 
 @triton.jit
 def store_kvcache_kernel(
@@ -112,7 +122,7 @@ class ExternalKVCacheManager:
         self.kv_group = dist.new_group(ranks = self.kv_group_list )
         dist.barrier(self.kv_group)
         self.actions = []
-        self.kv_shm = SharedMemory(name="kvcache")
+        self.kv_shm = SharedMemory(name=shm_name())
         self.ready_event.set()
         print(f'{self.prefix_str} External GPU Manager 初始化成功')
         threading.Thread(target=self.loop, daemon=True).start()
@@ -145,6 +155,7 @@ class ExternalKVCacheManager:
             try:
                 method_name, args = self.read_shm()
                 self.call(method_name, *args)
+                torch.cuda.synchronize(self.rank)
                 # print(f"{self.prefix_str} {method_name} set")
                 self.ready_event.set()
                 if method_name == "exit":
@@ -154,7 +165,7 @@ class ExternalKVCacheManager:
                 print(f"[rank {self.rank}] Error in loop: {e}")
                 import traceback
                 traceback.print_exc()
-                exit(1)
+                os._exit(1)
 
 
     def func1(self,param):
@@ -173,11 +184,17 @@ class ExternalKVCacheManager:
             self.blocks_stored_list[i] = self.blocks_stored_list[i] - self.offset
         max_block_id_loaded = max(self.blocks_loaded_list) if len(self.blocks_loaded_list)>0 else 0
         max_block_id_stored = max(self.blocks_stored_list) if len(self.blocks_stored_list)>0 else 0
+        assert min(self.blocks_loaded_list,default=0) >= 0
+        assert min(self.blocks_stored_list,default=0) >= 0
         assert max_block_id_loaded < self.num_kvcache_blocks
         assert max_block_id_stored < self.num_kvcache_blocks
-        self.blocks_loaded = torch.tensor(self.blocks_loaded_list,dtype = torch.int64, pin_memory = True).cuda(non_blocking=True)
-        self.blocks_stored = torch.tensor(self.blocks_stored_list,dtype = torch.int64, pin_memory = True).cuda(non_blocking=True)
+        self.blocks_loaded = torch.tensor(self.blocks_loaded_list,dtype = torch.int64, device="cpu", pin_memory = True).cuda(non_blocking=True)
+        self.blocks_stored = torch.tensor(self.blocks_stored_list,dtype = torch.int64, device="cpu", pin_memory = True).cuda(non_blocking=True)
         self.blocks_stored_buffer  = torch.empty(2,len(self.blocks_stored_list),self.block_size,self.num_kv_heads,self.head_dim,dtype=torch.bfloat16)
+        # The nonblocking CPU->GPU index copies above run on the default stream.
+        # Both consumers must wait before indexing remote cache on their streams.
+        self.send_stream.wait_stream(torch.cuda.current_stream())
+        self.recv_stream.wait_stream(torch.cuda.current_stream())
         # print("xxxxxx set_blocks_list",self.blocks_stored_buffer.device,torch.get_default_device(),torch.cuda.current_device())
         if len(self.blocks_loaded_list) > 0 and len(self.blocks_stored_list)>0:
             self.kvcache_management()
@@ -212,7 +229,10 @@ class ExternalKVCacheManager:
             range_pop()
             k_cache = self.k_cache[layer]
             v_cache = self.v_cache[layer]
-            store_kvcache(self.blocks_stored_buffer[0],self.blocks_stored_buffer[1],k_cache,v_cache,self.blocks_stored,self.block_elem_count)
+            # Views are layer-first but physically BLOCK-major. Indexed assignment
+            # honors their noncontiguous block stride; the old kernel did not.
+            k_cache[self.blocks_stored] = self.blocks_stored_buffer[0]
+            v_cache[self.blocks_stored] = self.blocks_stored_buffer[1]
 
 
     def send_full_kvcache(self,layer,dst = 0):
@@ -258,25 +278,19 @@ class ExternalKVCacheManager:
         self.master_block_element_all_layers = self.block_elem_count * self.num_hidden_layers
         print(f'{self.prefix_str} received kvcache info:({num_hidden_layers},{block_size},{num_kv_heads}, {head_dim})')
 
-    def init_kvcache_with_existing_tensor(self,k_cache, v_cache):
-        RED = "\033[91m"      # 亮红色
-        RESET = "\033[0m"     # 重置为默认颜色
-        self.k_cache = k_cache
-        self.v_cache = v_cache
-        print(f'{self.prefix_str} {RED}numel:{k_cache.numel()//(self.block_size * self.num_kv_heads * self.head_dim)}{RESET}')
-        self.num_kvcache_blocks = k_cache.numel()//(self.num_hidden_layers * self.block_size * self.num_kv_heads * self.head_dim)
-        total_elem = self.num_kvcache_blocks * self.num_hidden_layers * self.block_size * self.num_kv_heads * self.head_dim
-        self.k_cache = k_cache.view(-1)[:total_elem].view(self.num_hidden_layers, self.num_kvcache_blocks, self.block_size, self.num_kv_heads, self.head_dim)
-        self.v_cache = v_cache.view(-1)[:total_elem].view(self.num_hidden_layers, self.num_kvcache_blocks, self.block_size, self.num_kv_heads, self.head_dim)
-        script_path = os.path.abspath(__file__)
-        script_dir = os.path.dirname(script_path)
-        # print("xxxxxx init_kvcache_with_existing_tensor",torch.cuda.current_device())
-        print(f'{self.prefix_str} external_blocks_num:{self.num_kvcache_blocks}')
-        message_file = f'{script_dir}/num_blocks_{self.rank}.json'
-        with open(message_file, 'w') as f:
-            json.dump({self.rank:self.num_kvcache_blocks}, f) 
-        
-
+    def init_kvcache_with_existing_tensor(self,k_cache,v_cache,alignment_elements):
+        # Each K/V buffer uses (block, layer, token, head, dim). Restrict the
+        # borrowable region to a multiple of both models' complete block sizes.
+        total_elem=(k_cache.numel()//alignment_elements)*alignment_elements
+        self.num_kvcache_blocks=total_elem//self.master_block_element_all_layers
+        shape=(self.num_kvcache_blocks,self.num_hidden_layers,
+               self.block_size,self.num_kv_heads,self.head_dim)
+        self.k_cache=k_cache.view(-1)[:total_elem].view(shape).transpose(0,1)
+        self.v_cache=v_cache.view(-1)[:total_elem].view(shape).transpose(0,1)
+        message=runtime_dir()/f'num_blocks_{self.rank}.json'
+        temp=message.with_suffix('.tmp')
+        temp.write_text(json.dumps({self.rank:self.num_kvcache_blocks}))
+        temp.replace(message)
 
     def kvcache_management(self):
         if global_config['transfer_full_kvcache']:
@@ -313,7 +327,6 @@ class ExternalKVCacheController:
                 ):
         self.pid = os.getpid()
         print(f'ExternalKVCache PID {self.pid}')
-        self.clear_json_file()
         self.rank = rank
         self.prefix_str=f'[PID:{self.pid} RANK:{self.rank} Master]'
         self.clear_shared_memory()
@@ -324,6 +337,7 @@ class ExternalKVCacheController:
         self.slave_list = slave_list
         self.kv_group_list = master_list + slave_list
         self.world_size = len(self.kv_group_list)
+        self.clear_json_file()
         self.need_load = False
         self.need_store = False
         torch.set_default_dtype(torch.bfloat16)
@@ -338,13 +352,18 @@ class ExternalKVCacheController:
         print(f'{self.prefix_str},初始化成功！')
 
     def call(self,slave_ids, arguments):
+        # Never overwrite the shared command buffer before every receiver has
+        # completed the preceding command and its CUDA work.
+        self.wait_last_event(slave_ids)
         data = pickle.dumps(arguments)
         n = len(data)
+        if n+4 > len(self.kv_shm.buf):
+            raise ValueError('Shared command exceeds buffer capacity')
         self.kv_shm.buf[0:4] = n.to_bytes(4, "little")
         self.kv_shm.buf[4:n+4] = data
         for slave_id in slave_ids:
             # print(f"{self.prefix_str} wait before")
-            self.ready_events[slave_id].wait() #只有上一次call执行完毕了才能执下一次call
+            # Readiness checked before overwriting shared memory.
             # print(f"{self.prefix_str} wait after")
             event = self.events[slave_id]
             # print(type(self.events[slave_id]))
@@ -357,7 +376,8 @@ class ExternalKVCacheController:
         if slave_ids is None:
             slave_ids = self.slave_list
         for slave_id in slave_ids:
-            self.ready_events[slave_id].wait()
+            if not self.ready_events[slave_id].wait(timeout=120):
+                raise TimeoutError(f'Worker {slave_id} transfer did not complete')
 
     def init_kvcache(self,num_hidden_layers, num_kvcache_blocks_start_end, block_size, num_kv_heads, head_dim):
         # 这里后面可能还需要修改，因为不同slave的kvcache未必相同
@@ -412,7 +432,7 @@ class ExternalKVCacheController:
         self.stored_start_end = stored_start_end
         # self.blocks_loaded_buffer  = torch.empty(2,len(blocks_loaded_list), self.block_elem_count).cuda()
         self.blocks_stored_buffer  = torch.empty(2,len(blocks_stored_list), self.block_elem_count,device=f'cuda:{self.rank}')
-        self.local_blocks_stored = torch.tensor(local_blocks_stored_list,dtype = torch.int64, pin_memory=True).cuda(non_blocking=True)
+        self.local_blocks_stored = torch.tensor(local_blocks_stored_list,dtype = torch.int64, device="cpu", pin_memory=True).cuda(non_blocking=True)
         self.slave_info = {}
         args = {}
         blocks_loaded_sum = 0
@@ -448,61 +468,34 @@ class ExternalKVCacheController:
 
     
     def gather_info_from_slave(self):
-        script_path = os.path.abspath(__file__)
-        script_dir = os.path.dirname(script_path)
-        while True:
-            json_files = glob.glob(os.path.join(script_dir, "*.json"))
-            json_count = len(json_files)
-            print(f'{self.prefix_str} json_count:{json_count}, len(self.slave_list):{len(self.slave_list)}')
-            if json_count == len(self.slave_list):
-                break  # 数量够了，跳出循环
-            else:
-                time.sleep(1)  # 不够就等 0.01 秒重新检查
-            # json_files = glob.glob(os.path.join(script_dir, "*.json"))
-
-        # 2. 读取内容到字典
-        slave_blocks = {}
-        for file_path in json_files:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # 每个 JSON 只有一对 key-value
-                for k, v in data.items():
-                    slave_blocks[int(k)] = int(v)
-
-        # 3. 按 slave_id 排序
-        sorted_slaves = sorted(slave_blocks.items(), key=lambda x: x[0])
-
-        # 4. 前缀和
-        num_blocks_start_end = [0]
-        total = 0
-        for _, block_num in sorted_slaves:
-            total += block_num
-            num_blocks_start_end.append(total)
-        GREEN = "\033[92m"    # 亮绿色
-        RED = "\033[91m"      # 亮红色
-        RESET = "\033[0m"     # 重置为默认颜色
-        print(f'{GREEN}sorted_slaves:{sorted_slaves}, num_blocks_start_end:{num_blocks_start_end}{RESET}')
-        self.kv_cache_initialized = True
-        return sorted_slaves, num_blocks_start_end
+        files=[runtime_dir()/f'num_blocks_{rank}.json' for rank in self.slave_list]
+        deadline=time.monotonic()+120
+        while not all(p.exists() for p in files):
+            if time.monotonic()>deadline:
+                raise TimeoutError('Worker cache initialization timed out')
+            time.sleep(.05)
+        sorted_slaves=[]
+        boundaries=[0]
+        for rank,path in zip(self.slave_list,files):
+            count=int(json.loads(path.read_text())[str(rank)])
+            sorted_slaves.append((rank,count))
+            boundaries.append(boundaries[-1]+count)
+        self.kv_cache_initialized=True
+        return sorted_slaves,boundaries
 
     def clear_json_file(self):
-        script_path = os.path.abspath(__file__)
-        script_dir = os.path.dirname(script_path)
-
-        # 找到该目录下所有的 json 文件
-        json_files = glob.glob(os.path.join(script_dir, "*.json"))
-
-        # 删除每个文件
-        for file_path in json_files:
-            try:
-                os.remove(file_path)
-                print(f"已删除: {file_path}")
-            except Exception as e:
-                print(f"删除失败 {file_path}: {e}")
-                
-
+        for rank in self.slave_list:
+            (runtime_dir()/f'num_blocks_{rank}.json').unlink(missing_ok=True)
 
     def load_kvcache(self,k_cache,v_cache,layer_id):
+        measured=getattr(self,'profile_events',None)
+        if measured is not None:
+            begin=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True);begin.record()
+        self._load_kvcache(k_cache,v_cache,layer_id)
+        if measured is not None:
+            end.record();measured.append(('load',begin,end))
+
+    def _load_kvcache(self,k_cache,v_cache,layer_id):
         # print(f"{self.prefix_str} load start {layer_id}")
         # print(f'{self.prefix_str} layer:{layer_id}',k_cache.shape)
         for slave_id in self.slave_list:
@@ -527,6 +520,14 @@ class ExternalKVCacheController:
         # store_kvcache(self.blocks_loaded_buffer[0],self.blocks_loaded_buffer[1],k_cache,v_cache,self.blocks_loaded,self.block_elem_count)
         # print(f"{self.prefix_str} load end {layer_id}")
     def store_kvcache(self,k_cache,v_cache,layer_id):
+        measured=getattr(self,'profile_events',None)
+        if measured is not None:
+            begin=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True);begin.record()
+        self._store_kvcache(k_cache,v_cache,layer_id)
+        if measured is not None:
+            end.record();measured.append(('store',begin,end))
+
+    def _store_kvcache(self,k_cache,v_cache,layer_id):
         for slave_id in self.slave_list:
 
             if global_config['transfer_full_kvcache']:
@@ -550,15 +551,15 @@ class ExternalKVCacheController:
     #     self.call(self.slave_list,'kvcache_management')
     def create_shared_memory(self):
         if self.rank == self.master_list[0]:
-            self.kv_shm = SharedMemory(name="kvcache", create=True, size=2**20)
+            self.kv_shm = SharedMemory(name=shm_name(), create=True, size=2**20)
             dist.barrier(self.kv_group)
         else:
             dist.barrier(self.kv_group)
-            self.kv_shm = SharedMemory(name="kvcache")
+            self.kv_shm = SharedMemory(name=shm_name())
     
     def clear_shared_memory(self):
         try:
-            existing_shm = SharedMemory(name="kvcache")
+            existing_shm = SharedMemory(name=shm_name())
             existing_shm.close()
             existing_shm.unlink()
             print(f"{self.prefix_str} 清理了旧的共享内存")

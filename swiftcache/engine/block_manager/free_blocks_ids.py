@@ -1,216 +1,184 @@
+"""Free lists with explicit ownership; all public IDs are global IDs.
+
+Changing a boundary never moves KV tensors. Active blocks are drained by the
+coordinator before a boundary can be handed to the other model.
+"""
 import heapq
-import time
-from typing import Optional
-from swiftcache.engine.block_manager.block import Block
-from swiftcache.config import Config
+
+
 class FreeBlockIdsBase:
-    def __init__(self, blocks, offset: int = 0, config=None, minimum_scaling_block_count=0):
-        self.config = config
+    def __init__(self, blocks, offset=0, config=None, minimum_scaling_block_count=1):
         self.blocks = blocks
         self.offset = offset
-        self.minimum_scaling_block_count = minimum_scaling_block_count
-        self._heap = []
-
-    # ======== Interface-like methods ========
-    def scale_up(self, *args, **kwargs):
-        """Expand resources (should be overridden by subclass)"""
-        raise NotImplementedError("scale_up() is not implemented in this class.")
-
-    def scale_down(self, *args, **kwargs):
-        """Shrink resources (should be overridden by subclass)"""
-        raise NotImplementedError("scale_down() is not implemented in this class.")
-
-    # ======== Shared methods ========
-    def push(self, block_id: int):
-        block = self.blocks[block_id]
-        heapq.heappush(self._heap, block)
-
-    def append(self, block_id: int):
-        self.push(block_id)
-
-    def pop(self) -> Optional[int]:
-        if not self._heap:
-            return None
-        block = heapq.heappop(self._heap)
-        return block.block_id
-
-    def peek(self) -> Optional[int]:
-        if not self._heap:
-            return None
-        return self._heap[0].block_id
-    
-    def remove(self, block_id: int) -> bool:
-        """根据 block_id 删除堆中对应的 Block"""
-        block_id += self.offset
-        for i, block in enumerate(self._heap):
-            if block.block_id == block_id:
-                # 删除该元素
-                # print(f"即将删除{block_id}")
-                self._heap.pop(i)
-                # 重新建堆
-                heapq.heapify(self._heap)
-                return True
-        return False  # 没找到
-
-    def remove_batch_with_global_id(self, global_block_ids: list[int]):
-        global_block_ids_set = set(global_block_ids)
-        self._heap = [block for block in self._heap if block.block_id not in global_block_ids_set]
-        heapq.heapify(self._heap)
-
-    def push_batch_with_global_id(self, block_ids: list[int]):
-        new_blocks = [self.blocks[b_id - self.offset] for b_id in block_ids]
-        self._heap.extend(new_blocks)
-        heapq.heapify(self._heap)
+        self.config = config
+        self.minimum_scaling_block_count = max(1, minimum_scaling_block_count)
+        self.by_id = {b.block_id: b for b in blocks}
+        self._free = set()
+        self._heap_cache=[]
+        self._heap_dirty=True
 
     @property
-    def num_blocks_lent(self):
-        return len(self.blocks) - len(self._heap)
+    def _heap(self):
+        if self._heap_dirty:
+            self._heap_cache=[self.by_id[i] for i in self._free]
+            heapq.heapify(self._heap_cache)
+            self._heap_dirty=False
+        return self._heap_cache
+
+    def push(self, block_id):
+        if not self.owns(block_id):
+            return
+        if self.by_id[block_id].ref_count:
+            raise RuntimeError('Cannot free a referenced block')
+        if block_id in self._free:
+            raise RuntimeError('Double free')
+        self._free.add(block_id)
+        self._heap_dirty=True
+
+    append = push
+
+    def remove(self, block_id):
+        if block_id not in self._free:
+            raise RuntimeError(f'Block {block_id} is not free/owned')
+        self._free.remove(block_id)
+        if not self._heap_dirty and self._heap_cache and self._heap_cache[0].block_id==block_id:
+            heapq.heappop(self._heap_cache)
+        else:
+            self._heap_dirty=True
+        return True
+
+    def remove_batch_with_global_id(self, ids):
+        self._free.difference_update(ids)
+        self._heap_dirty=True
 
     def __len__(self):
-        return len(self._heap)
+        return len(self._free)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index):
         return self._heap[index].block_id
 
 
 class MasterFreeBlockIds(FreeBlockIdsBase):
-    def __init__(self, blocks, offset=0, config=None, minimum_scaling_block_count=0):
+    def __init__(self, blocks, offset=0, config=None, minimum_scaling_block_count=1, reserved=None):
         super().__init__(blocks, offset, config, minimum_scaling_block_count)
-        # Master keeps all blocks except initial reserved ones
-        self.init_block_num = minimum_scaling_block_count
-        self._heap = list(blocks[self.init_block_num:])
-        heapq.heapify(self._heap)
+        self.init_block_num = minimum_scaling_block_count if reserved is None else reserved
+        if not 0 <= self.init_block_num <= len(blocks):
+            raise ValueError('Invalid initial reserved boundary')
+        self.draining = set()
+        self._free = {b.block_id for b in blocks[self.init_block_num:]}
 
-    def scale_down(self, n: int):
-        """Master-specific shrink"""
-        num_blocks = self.minimum_scaling_block_count * n
-        global_block_ids = [
-            block.block_id for block in
-            self.blocks[self.init_block_num:self.init_block_num + num_blocks]
-        ]
-        print(f"[Master] Global block IDs to remove: {global_block_ids}")
-        t = time.perf_counter()
-        self.remove_batch_with_global_id(global_block_ids)
-        print(f"[Master] scale_down took {time.perf_counter() - t:.6f} sec")
-        self.init_block_num += num_blocks
+    def owns(self, block_id):
+        return (block_id in self.by_id and
+                block_id >= self.offset + self.init_block_num and
+                block_id not in self.draining)
 
-    def master_scale_down_many(self, n:int):
-        num_blocks = self.minimum_scaling_block_count * n
-        global_block_ids = [block.block_id for block in self.blocks[self.init_block_num: self.init_block_num + num_blocks]]
-        print(f'即将被缩减的global_block_ids:{global_block_ids}')
-        t = time.perf_counter()
-        self.remove_batch_with_global_id(global_block_ids)
-        print(time.perf_counter()-t)
-        self.init_block_num += num_blocks
+    def drain(self, target):
+        if not self.init_block_num <= target <= len(self.blocks):
+            raise ValueError('Invalid reclaim boundary')
+        ids = set(range(self.offset + self.init_block_num, self.offset + target))
+        self.draining.update(ids)
+        self._free.difference_update(ids)
+        self._heap_dirty=True
+        return ids
+
+    def set_reserved(self, target):
+        if not 0 <= target <= len(self.blocks):
+            raise ValueError('Invalid reserved boundary')
+        old = self.init_block_num
+        if target > old:
+            ids = set(range(self.offset + old, self.offset + target))
+            if any(self.by_id[i].ref_count for i in ids):
+                raise RuntimeError('Attempted to hand off active KV')
+            self._free.difference_update(ids)
+            self.draining.difference_update(ids)
+        else:
+            ids = set(range(self.offset + target, self.offset + old))
+            if any(self.by_id[i].ref_count for i in ids):
+                raise RuntimeError('Returned memory is still referenced')
+            self._free.update(ids)
+        self.init_block_num = target
+        self._heap_dirty=True
+        return ids
+
+    def scale_down(self, n):
+        return self.set_reserved(self.init_block_num + n*self.minimum_scaling_block_count)
 
 
 class SlaveFreeBlockIds(FreeBlockIdsBase):
-    def __init__(self, blocks, offset=0, config=None, minimum_scaling_block_count = 1):
+    def __init__(self, blocks, offset=0, config=None, minimum_scaling_block_count=1):
         super().__init__(blocks, offset, config, minimum_scaling_block_count)
-        # Slave gets initial N blocks
-        self.init_block_num = minimum_scaling_block_count
-        self._heap = list(blocks[:self.init_block_num])
-        heapq.heapify(self._heap)
+        initial = getattr(config, 'elastic_initial_blocks', 1)
+        unit = self.minimum_scaling_block_count
+        self.init_block_num = min(len(blocks), ((initial+unit-1)//unit)*unit)
+        self._free = {b.block_id for b in blocks[:self.init_block_num]}
 
-    def scale_up(self, n: int = 1):
-        """Slave-specific expansion"""
-        self._heap.extend(
-            self.blocks[self.init_block_num:
-                        self.init_block_num + self.minimum_scaling_block_count * n]
-        )
-        heapq.heapify(self._heap)
-        self.init_block_num += self.minimum_scaling_block_count * n
-        print(f"[Slave] init_block_num after scale_up: {self.init_block_num}")
-    
-    def scale_up_with_specific_blocks(self,num_blocks:int):
-        n = (num_blocks + self.minimum_scaling_block_count - 1) // self.minimum_scaling_block_count
-        self.scale_up(n)
+    @property
+    def num_blocks_lent(self):
+        return len(self.blocks) - self.init_block_num
+
+    def owns(self, block_id):
+        return block_id in self.by_id and block_id < self.init_block_num
+
+    def set_reserved(self, target):
+        if not 0 <= target <= len(self.blocks):
+            raise ValueError('Invalid worker boundary')
+        old = self.init_block_num
+        ids = set(range(min(old,target), max(old,target)))
+        if any(self.by_id[i].ref_count for i in ids):
+            raise RuntimeError('Attempted to return active worker KV')
+        if target > old:
+            self._free.update(ids)
+        else:
+            self._free.difference_update(ids)
+        self.init_block_num = target
+        self._heap_dirty=True
+        return ids
 
 
 class MultiFreeBlockIds:
-    def __init__(self,blocks: list[Block], num_blocks_start_end: list[int],local_num_blocks,config:Config,minimum_scaling_block_count:int):
-        # assert len(blocks) == num_blocks_start_end[-1]
+    def __init__(self, blocks, num_blocks_start_end, local_num_blocks, config, minimum_scaling_block_count):
         self.blocks = blocks
-        self.minimum_scaling_block_count = minimum_scaling_block_count
-        self.n_group = len(num_blocks_start_end)-1
         self.num_blocks_start_end = num_blocks_start_end
-        self.local_num_blocks = len(blocks) - num_blocks_start_end[-1]
-        self.n_blocks = len(blocks)
+        self.n_group = len(num_blocks_start_end)-1
         self.multi_free_block_ids = []
-        self.n_free_blocks = self.n_blocks
         for i in range(self.n_group):
-            free_blocks_ids = MasterFreeBlockIds(blocks[num_blocks_start_end[i]:num_blocks_start_end[i+1]],num_blocks_start_end[i],config,minimum_scaling_block_count[i])
-            self.multi_free_block_ids.append(free_blocks_ids)
-        self.local_free_block_ids = MasterFreeBlockIds(blocks[num_blocks_start_end[-1]:], num_blocks_start_end[-1], config)
-        self.counter = 0
-        print(f'n_free_blocks init:{self.n_free_blocks}')
-        self.sync_num_free_blocks()
-    def get_group_idx(self, block_id):
-        for i in range(self.n_group):
-            if block_id >= self.num_blocks_start_end[i] and block_id < self.num_blocks_start_end[i+1]:
-                return i
-        
-        return -1
-        
+            lo,hi = num_blocks_start_end[i:i+2]
+            self.multi_free_block_ids.append(MasterFreeBlockIds(
+                blocks[lo:hi], lo, config, minimum_scaling_block_count[i],
+                config.initial_reserved_master[i]))
+        lo = num_blocks_start_end[-1]
+        self.local_free_block_ids = MasterFreeBlockIds(blocks[lo:],lo,config,reserved=0)
 
-    def append(self,block_id):
-        self.n_free_blocks += 1
-        group_id = self.get_group_idx(block_id)
-        block_id_in_group = block_id - self.num_blocks_start_end[group_id] # -offset
-        if group_id != -1:
-            self.multi_free_block_ids[group_id].append(block_id_in_group)
-        else:
-            self.local_free_block_ids.append(block_id_in_group)
+    @property
+    def groups(self):
+        return self.multi_free_block_ids+[self.local_free_block_ids]
+
+    def get_group_idx(self, block_id):
+        for i,(lo,hi) in enumerate(zip(self.num_blocks_start_end,self.num_blocks_start_end[1:])):
+            if lo <= block_id < hi:
+                return i
+        return -1
+
+    def group(self, block_id):
+        idx=self.get_group_idx(block_id)
+        return self.multi_free_block_ids[idx] if idx >= 0 else self.local_free_block_ids
+
+    def owns(self, block_id):
+        return self.group(block_id).owns(block_id)
+
+    def append(self, block_id):
+        self.group(block_id).append(block_id)
 
     def remove(self, block_id):
-        self.n_free_blocks -= 1
-        group_id = self.get_group_idx(block_id)
-        block_id_in_group = block_id - self.num_blocks_start_end[group_id] # -offset
-        if group_id != -1:
-            self.multi_free_block_ids[group_id].remove(block_id_in_group)
-        else:
-            self.local_free_block_ids.remove(block_id_in_group)
+        return self.group(block_id).remove(block_id)
 
     def __len__(self):
-        return self.n_free_blocks
+        return sum(len(g) for g in self.groups)
 
-    def __getitem__(self, index: int):
-        # 如果所有 external group 都空，直接处理
-        if all(len(g) == 0 for g in self.multi_free_block_ids):
-            if len(self.local_free_block_ids) == 0:
-                raise ValueError("external 和 local 的 block 都空了")
-            # external 都空 → 返回 local
-            return self.local_free_block_ids._heap[index].block_id
+    def __getitem__(self, index):
+        if index != 0:
+            raise IndexError('Only the next candidate is supported')
+        return min((g._heap[0] for g in self.groups if len(g))).block_id
 
-        # 找到第一个非空的 external group
-        for _ in range(self.n_group):
-            if len(self.multi_free_block_ids[self.counter]) > 0:
-                break
-            print(f"group_id:{self.counter} 的 block 已经全部用完")
-            self.counter = (self.counter + 1) % self.n_group
-
-        external_block = self.multi_free_block_ids[self.counter]._heap[index]
-
-        # 如果 local 为空，直接返回 external
-        if len(self.local_free_block_ids) == 0:
-            return external_block.block_id
-
-        local_block = self.local_free_block_ids._heap[index]
-        # print(f'{external_block.block_id},{local_block.block_id}')
-        if external_block < local_block:
-            self.counter = (self.counter + 1) % self.n_group
-            return external_block.block_id
-        else:
-            return local_block.block_id
-    
-    def master_scale_down_many(self,slave_idx:int, n:int):
-        self.multi_free_block_ids[slave_idx].master_scale_down_many(n)
-        num_blocks = self.minimum_scaling_block_count[slave_idx] * n
-        self.n_free_blocks - num_blocks
-    
     def sync_num_free_blocks(self):
-        self.n_free_blocks = 0
-        for free_blocks_ids  in self.multi_free_block_ids:
-            self.n_free_blocks += len(free_blocks_ids)
-        self.n_free_blocks += len(self.local_free_block_ids)
-        # print(f'n_free_blocks sync:{self.n_free_blocks}')
+        return len(self)

@@ -27,7 +27,7 @@ class Config:
     rank: int = 0
     role: str = 'master'
     dist_port:int = 2334
-    external_kvcache_config: ExternalKVCacheConfig = ExternalKVCacheConfig()
+    external_kvcache_config: ExternalKVCacheConfig = field(default_factory=ExternalKVCacheConfig)
     master_list:list = field(default_factory = list)
     slave_list:list = field(default_factory = list)
     slave_event:dict | Event = field(default_factory = dict)
@@ -40,13 +40,32 @@ class Config:
 
 
 
+    cache_block_limit: int = -1
+    elastic_enabled: bool = True
+    elastic_initial_blocks: int = 1
+    elastic_window_seconds: float = 60.0
+    elastic_check_seconds: float = 1.0
+    control_timeout_seconds: float = 120.0
+    ignore_model_max_length: bool = False
+    warmup_tokens: int = 2048
+    profile_stages: bool = False
+    scheduler_backend: str = 'python'
+
     def __post_init__(self):
+        if self.scheduler_backend not in ('python', 'cpp'):
+            raise ValueError('scheduler_backend must be python or cpp')
         assert os.path.isdir(self.model)
         assert self.kvcache_block_size % 256 == 0
         assert 1 <= self.tensor_parallel_size <= 8
         self.hf_config = AutoConfig.from_pretrained(self.model)
         max_position_embeddings = getattr(self.hf_config, 'max_position_embeddings', None)
         max_position_embeddings = max_position_embeddings if max_position_embeddings is not None else self.hf_config.language_config.max_position_embeddings
-        self.max_model_len = min(self.max_model_len, max_position_embeddings )
-        assert self.max_num_batched_tokens >= self.max_model_len
+        self.original_model_max_length = max_position_embeddings
+        if self.max_model_len <= 0 or self.max_num_batched_tokens <= 0:
+            raise ValueError('Context length and batch token budget must be positive')
+        if self.ignore_model_max_length:
+            self.hf_config.max_position_embeddings = max(max_position_embeddings,self.max_model_len)
+            print(f'Ignoring model context cap {max_position_embeddings}; runtime limit={self.max_model_len}; RoPE unchanged',flush=True)
+        else:
+            self.max_model_len = min(self.max_model_len, max_position_embeddings)
 

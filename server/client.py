@@ -1,46 +1,38 @@
-import requests
+"""Official OpenAI SDK client; no SwiftCache-specific request objects."""
 
-def send_request(
-    method: str,
-    url: str,
-    query_params: dict = None,
-    body: dict = None,
-    headers: dict = None
-):
-    """
-    发送 HTTP 请求。
+import argparse
+import os
+from openai import OpenAI
 
-    :param method: HTTP 方法 ('GET', 'POST', 'PUT', 'DELETE' 等)
-    :param url: 请求的 URL
-    :param query_params: URL 查询参数 (字典)，会自动拼到 URL 后
-    :param body: 请求 Body 数据 (字典)，会自动转成 JSON
-    :param headers: 请求头 (字典)
-    :return: 响应对象 (requests.Response)
-    """
-    try:
-        response = requests.request(
-            method=method.upper(),
-            url=url,
-            params=query_params,  # Query 参数
-            json=body,            # JSON Body
-            headers=headers        # 请求头
-        )
-        return response
-    except Exception as e:
-        print(f"发送请求时发生错误: {e}")
-        return None
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument(
+        "--base-url",
+        default=os.environ.get("OPENAI_BASE_URL", "http://127.0.0.1:18000/v1"),
+    )
+    p.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY", "local"))
+    p.add_argument("--model", default="qwen3-8b-master")
+    p.add_argument("--prompt", default="What is 2 + 2? Answer briefly.")
+    p.add_argument("--max-tokens", type=int, default=64)
+    p.add_argument("--stream", action="store_true")
+    args = p.parse_args()
+    client = OpenAI(base_url=args.base_url, api_key=args.api_key)
+    result = client.chat.completions.create(
+        model=args.model,
+        messages=[dict(role="user", content=args.prompt)],
+        max_completion_tokens=args.max_tokens,
+        temperature=0,
+        stream=args.stream,
+    )
+    if args.stream:
+        for chunk in result:
+            if chunk.choices and chunk.choices[0].delta.content:
+                print(chunk.choices[0].delta.content, end="", flush=True)
+        print()
+    else:
+        print(result.choices[0].message.content)
 
 
 if __name__ == "__main__":
-    # 示例调用
-    url = "http://127.0.0.1:8000/generate"
-
-    query = {"name": "Tom", "age": 18}   # Query 参数
-    body = {"prompt": "Hello World", "max_tokens": 100}  # JSON Body
-    headers = {"Authorization": "Bearer your_token_here"}  # 请求头
-
-    resp = send_request("POST", url, query_params=query, body=body, headers=headers)
-
-    if resp is not None:
-        print("状态码:", resp.status_code)
-        print("响应内容:", resp.text)
+    main()

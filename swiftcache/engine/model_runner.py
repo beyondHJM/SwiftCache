@@ -24,6 +24,9 @@ import math
 class ModelRunner:
 
     def __init__(self, config: Config, rank: int, event: Event | list[Event], vl_chat_processor=None):
+        torch.cuda.set_device(rank)
+        from swiftcache.utils.context import init_device_context
+        init_device_context()
         self.pid = os.getpid()
         self.rank = rank
         self.record_pid()
@@ -53,7 +56,11 @@ class ModelRunner:
 
         self.vl_chat_processor=vl_chat_processor
         # dist.init_process_group("nccl", "tcp://localhost:2334", world_size=self.world_size, rank=rank)
-        self.tp_group = dist.new_group(ranks=config.tp_group)
+        # All distributed ranks must create groups in the same order.
+        if config.tensor_parallel_size != 1:
+            raise NotImplementedError("Elastic runtime currently requires TP=1 per model")
+        groups = {r: dist.new_group(ranks=[r]) for r in self.master_list + self.slave_list}
+        self.tp_group = groups[rank]
         self.first_rank = config.tp_group[0]
         set_tp_group(self.tp_group,config.tp_group[0])
         set_role(self.role)
@@ -154,9 +161,10 @@ class ModelRunner:
         t = time.perf_counter()
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
-        max_num_batched_tokens, max_model_len = self.config.max_num_batched_tokens, self.config.max_model_len
+        max_model_len=min(self.config.warmup_tokens,self.config.max_model_len)
+        max_num_batched_tokens=max(max_model_len,self.config.max_num_batched_tokens)
         print(self.config.max_num_batched_tokens,self.config.max_model_len,self.config.max_num_seqs)
-        num_seqs = min(max_num_batched_tokens // max_model_len, self.config.max_num_seqs)
+        num_seqs = 1  # initialization scratch size is independent of serving context/batch limits
         print(f'num_seqs:{num_seqs}')
         seqs = [Sequence([0] * max_model_len) for _ in range(num_seqs)]
         self.run(seqs, True)
@@ -186,7 +194,7 @@ class ModelRunner:
         block_bytes = 2  *num_layers_with_extra_cache* self.block_size * num_kv_heads * head_dim * hf_config.torch_dtype.itemsize
         total_bytes_for_kvcache = int(total * config.gpu_memory_utilization - used - peak + current)
         config.num_kvcache_blocks = total_bytes_for_kvcache // block_bytes
-        global_num_kvcache_blocks = global_config['num_kvcache_blocks']
+        global_num_kvcache_blocks = config.cache_block_limit if config.cache_block_limit > 0 else global_config['num_kvcache_blocks']
         if global_num_kvcache_blocks != -1:
             config.num_kvcache_blocks = global_num_kvcache_blocks
             print(f'Use global config "num_kvcache_blocks:{global_num_kvcache_blocks}".')
@@ -231,7 +239,7 @@ class ModelRunner:
         block_bytes = 2  *num_layers_with_extra_cache* self.block_size * num_kv_heads * head_dim * hf_config.torch_dtype.itemsize
         total_bytes_for_kvcache = int(total * config.gpu_memory_utilization - used - peak + current)
         config.num_kvcache_blocks = total_bytes_for_kvcache // block_bytes
-        global_num_kvcache_blocks = global_config['num_kvcache_blocks']
+        global_num_kvcache_blocks = config.cache_block_limit if config.cache_block_limit > 0 else global_config['num_kvcache_blocks']
         if global_num_kvcache_blocks != -1:
             config.num_kvcache_blocks = global_num_kvcache_blocks
             print(f'Use global config "num_kvcache_blocks:{global_num_kvcache_blocks}".')
@@ -266,7 +274,7 @@ class ModelRunner:
             for item in sorted_slaves:
                 print(f'slave_id:{item[0]},num_blocks:{item[1]}')
             print(f'master_id:{self.rank},num_blocks:{self.local_num_blocks}')
-            ratio = total_num_blocks / original_num_blocks_without_external_kvcache
+            ratio = total_num_blocks / original_num_blocks_without_external_kvcache if original_num_blocks_without_external_kvcache else float('inf')
             print(f"{BLUE}[Prompt Capacity] {total_num_blocks} blocks, max length:{total_num_blocks*config.kvcache_block_size} — {ratio:.2f}× baseline capacity.{RESET}")
             config.external_kvcache_config.num_blocks_start_end = num_blocks_start_end
             config.external_kvcache_config.num_external_kvcache = len(self.slave_list)
@@ -312,7 +320,7 @@ class ModelRunner:
         print(f'total memory:{total * config.gpu_memory_utilization}')
         config.num_kvcache_blocks = total_bytes_for_kvcache // block_bytes
         print(f'max number of kvcache blocks:{config.num_kvcache_blocks}')
-        global_num_kvcache_blocks = global_config['num_kvcache_blocks']
+        global_num_kvcache_blocks = config.cache_block_limit if config.cache_block_limit > 0 else global_config['num_kvcache_blocks']
         if global_num_kvcache_blocks >0:
             config.num_kvcache_blocks = global_num_kvcache_blocks
             print(f'Use global config "num_kvcache_blocks:{global_num_kvcache_blocks}".')
@@ -336,7 +344,7 @@ class ModelRunner:
         if self.role == 'slave':
             while not self.manager.recieved_master_kvcache_info:
                 time.sleep(1)
-            self.manager.init_kvcache_with_existing_tensor(self.kv_cache[0], self.kv_cache[1])
+
         master_block_element_all_layers = self.manager.master_block_element_all_layers
         slave_block_element_all_layers =  hf_config.num_hidden_layers * self.block_size * num_kv_heads * head_dim
         lcm_val = math.lcm(master_block_element_all_layers, slave_block_element_all_layers)
@@ -347,6 +355,8 @@ class ModelRunner:
         print(f'slave_minimum_scaling_block_count:{slave_minimum_scaling_block_count}')
         config.master_minimum_scaling_block_count = master_minimum_scaling_block_count
         config.slave_minimum_scaling_block_count = slave_minimum_scaling_block_count
+        config.num_kvcache_blocks = (config.num_kvcache_blocks//slave_minimum_scaling_block_count)*slave_minimum_scaling_block_count
+        self.manager.init_kvcache_with_existing_tensor(self.kv_cache[0],self.kv_cache[1],lcm_val)
         # print(f"yyyyy:{config.slave_minimum_scaling_block_count}")
 
 
@@ -356,7 +366,7 @@ class ModelRunner:
             block_tables =[seq.local_block_table + [-1] * (max_len - len(seq.local_block_table)) for seq in seqs]
         else:
             block_tables = [seq.block_table + [-1] * (max_len - len(seq.block_table)) for seq in seqs]
-        block_tables = torch.tensor(block_tables, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
+        block_tables = torch.tensor(block_tables, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
         return block_tables
 
     def set_local_block_tables(self, seqs,is_prefill, config):
@@ -564,7 +574,8 @@ class ModelRunner:
         for seq in seqs:
             seqlen = len(seq)
             input_ids.extend(seq[seq.num_cached_tokens:])
-            print(f'{self.prefix_str} 请求{seq.seq_id},命中了{seq.num_cached_tokens}个token，请求的prompt长度为{seq.num_prompt_tokens}')
+            if os.environ.get('SWIFTCACHE_DEBUG'):
+                print(f'{self.prefix_str} request={seq.seq_id} cached={seq.num_cached_tokens} prompt={seq.num_prompt_tokens}')
             positions.extend(list(range(seq.num_cached_tokens, seqlen)))
             if seq.input_embeds is not None:
                 input_embeds.append(seq.input_embeds[seq.num_cached_tokens:,:])
@@ -612,12 +623,12 @@ class ModelRunner:
         if cu_seqlens_k[-1] > cu_seqlens_q[-1]:    # prefix cache
             block_tables= self.prepare_block_tables(seqs)
         # print(f"{self.prefix_str},{input_ids}")
-        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).cuda(non_blocking=True)
-        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).cuda(non_blocking=True)
-        cu_seqlens_q = torch.tensor(cu_seqlens_q, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
-        cu_seqlens_k = torch.tensor(cu_seqlens_k, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
-        slot_mapping = torch.tensor(slot_mapping, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
-        block_id_to_fix = torch.tensor(block_id_to_fix , dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
+        input_ids = torch.tensor(input_ids, dtype=torch.int64, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        positions = torch.tensor(positions, dtype=torch.int64, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        cu_seqlens_q = torch.tensor(cu_seqlens_q, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        cu_seqlens_k = torch.tensor(cu_seqlens_k, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        slot_mapping = torch.tensor(slot_mapping, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        block_id_to_fix = torch.tensor(block_id_to_fix , dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
         set_context(True, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, slot_mapping, None, block_tables, block_id_to_fix, self.cpu_kv_cache_manager)
 
         if self.role == 'master' and self.controller.kv_cache_initialized:
@@ -641,7 +652,7 @@ class ModelRunner:
         block_id_to_fix = []
         for seq in seqs:
             input_ids.append(seq.last_token)
-            positions.append(len(seq))
+            positions.append(len(seq) - 1)
             context_lens.append(len(seq))
             # slot_mapping.append(seq.block_table[-1]* self.block_size + seq.last_block_num_tokens  - 1)
             slot_mapping.append(seq.block_table[-1] * self.config.hf_config.num_hidden_layers * self.block_size + seq.last_block_num_tokens  - 1)
@@ -658,11 +669,11 @@ class ModelRunner:
             self.cpu_kv_cache_manager.non_cached_block_table_grouped = non_cached_block_table_grouped
 
 
-        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).cuda(non_blocking=True)
-        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).cuda(non_blocking=True)
-        slot_mapping = torch.tensor(slot_mapping, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
-        context_lens = torch.tensor(context_lens, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
-        block_id_to_fix = torch.tensor(block_id_to_fix , dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)
+        input_ids = torch.tensor(input_ids, dtype=torch.int64, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        positions = torch.tensor(positions, dtype=torch.int64, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        slot_mapping = torch.tensor(slot_mapping, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        context_lens = torch.tensor(context_lens, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        block_id_to_fix = torch.tensor(block_id_to_fix , dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
         
         block_tables = self.prepare_block_tables(seqs)
         set_context(False, slot_mapping=slot_mapping, context_lens=context_lens, block_tables=block_tables, block_id_to_fix = block_id_to_fix, cpu_kv_cache_manager = self.cpu_kv_cache_manager)
@@ -675,7 +686,8 @@ class ModelRunner:
         temperatures = []
         for seq in seqs:
             temperatures.append(seq.temperature)
-        temperatures = torch.tensor(temperatures, dtype=torch.float32, pin_memory=True).cuda(non_blocking=True)
+        temperatures = torch.tensor(temperatures, dtype=torch.float32, device="cpu", pin_memory=True).cuda(non_blocking=True)
+        self.sample_top_ps = torch.tensor([getattr(seq,'top_p',1.0) for seq in seqs],dtype=torch.float32,device='cpu',pin_memory=True).cuda(non_blocking=True)
         return temperatures
 
     @torch.inference_mode()
@@ -703,19 +715,43 @@ class ModelRunner:
             graph.replay()
             return self.model.compute_logits(graph_vars["outputs"][:bs])
 
-    def run(self, seqs: list[Sequence], is_prefill: bool) -> list[int]:
-        self.cal_num_blocks_per_slave(seqs,self.config)
-        t1 = time.perf_counter()
-        input_ids, positions,input_embeds = self.prepare_prefill(seqs) if is_prefill else self.prepare_decode(seqs)
-        # print('input_ids:',input_ids.shape)
-        temperatures = self.prepare_sample(seqs) if self.rank == self.first_rank else None
-        logits = self.run_model(input_ids, positions,input_embeds, is_prefill,input_embeds is not None)
-        range_push("sample")
+    def quiesce(self):
+        # Finish all layer transfers before releasing blocks or changing ownership.
+        torch.cuda.synchronize(self.rank)
+        if self.role == 'master':
+            self.controller.wait_last_event()
 
-        token_ids = self.sampler(logits, temperatures) if self.rank == self.first_rank else None
-        token_ids = token_ids.tolist()
-        # print('run time:',time.perf_counter() - t1)
-        range_pop()
+    def run(self, seqs: list[Sequence], is_prefill: bool) -> list[int]:
+        t0=time.perf_counter_ns()
+        self.cal_num_blocks_per_slave(seqs,self.config)
+        if self.role=='master':
+            self.controller.profile_events=[] if self.config.profile_stages else None
+        input_ids,positions,input_embeds=self.prepare_prefill(seqs) if is_prefill else self.prepare_decode(seqs)
+        temperatures=self.prepare_sample(seqs)
+        t1=time.perf_counter_ns()
+        if self.config.profile_stages:
+            start=torch.cuda.Event(enable_timing=True);end=torch.cuda.Event(enable_timing=True)
+            start.record()
+        logits=self.run_model(input_ids,positions,input_embeds,is_prefill,input_embeds is not None)
+        if self.config.profile_stages: end.record()
+        t2=time.perf_counter_ns()
+        token_ids=self.sampler(logits,temperatures,self.sample_top_ps).tolist()
+        self.quiesce()
+        t3=time.perf_counter_ns()
+        metric=dict(prepare_wall_ms=(t1-t0)/1e6,model_submit_wall_ms=(t2-t1)/1e6,
+                    model_and_sample_wall_ms=(t3-t1)/1e6,
+                    input_query_tokens=int(input_ids.numel()),batch_size=len(seqs))
+        if self.config.profile_stages:
+            metric['model_gpu_span_ms']=start.elapsed_time(end)
+            metric['logits_finite']=bool(torch.isfinite(logits).all())
+            events=self.controller.profile_events if self.role=='master' else []
+            for action in ['load','store']:
+                metric[f'kv_{action}_span_sum_ms']=sum(x.elapsed_time(y) for kind,x,y in events if kind==action)
+        if self.role=='master':
+            info=getattr(self.controller,'slave_info',{})
+            metric['remote_loaded_blocks']=sum(v['load']['length'] for v in info.values())
+            metric['remote_stored_blocks']=sum(v['store']['length'] for v in info.values())
+        self.last_run_metrics=metric
         reset_context()
         return token_ids
 
@@ -826,4 +862,4 @@ class ModelRunner:
         pid_dict = {'pid':self.pid}
         file_path = global_config['os_pid_dir']+f'rank{self.rank}.json'
         with open(file_path, 'w') as f:
-            json.dump(pid_dict, f) 
+            json.dump(pid_dict, f)

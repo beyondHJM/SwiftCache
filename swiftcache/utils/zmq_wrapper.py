@@ -4,7 +4,7 @@ import os
 from typing import Dict, Any, Optional, List
 import time
 
-DEFAULT_ADDRESS = "ipc:///tmp/zmq_default.sock"
+DEFAULT_ADDRESS = os.environ.get("SWIFTCACHE_CONTROL_ADDRESS", "ipc:///tmp/zmq_default.sock")
 
 
 
@@ -14,6 +14,7 @@ class ZMQClient:
         self.context = zmq.Context()
         self.name = name
         self.socket = self.context.socket(socket_type)
+        self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.setsockopt(zmq.IDENTITY, self.name.encode('utf-8'))
         self.socket.connect(address)
 
@@ -43,6 +44,7 @@ class ZMQServer:
     def __init__(self, address: str = DEFAULT_ADDRESS, socket_type=zmq.ROUTER):
         self.context = zmq.Context()
         self.socket = self.context.socket(socket_type)
+        self.socket.setsockopt(zmq.LINGER, 0)
         if address.startswith("ipc://"):
             path = address.replace("ipc://", "")
             if os.path.exists(path):
